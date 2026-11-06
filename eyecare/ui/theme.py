@@ -28,7 +28,7 @@ QLabel#Accent {{ color: {p.accent}; }}
 QLabel#Display {{ font-size: {F['display']}px; font-weight: 600; }}
 
 QFrame#Card {{ background: {p.surface}; border: 1px solid {p.border}; border-radius: {R['lg']}px; }}
-QFrame#CardFlat {{ background: {p.surface_raised}; border-radius: {R['md']}px; }}
+#CardFlat {{ background: {p.surface_raised}; border-radius: {R['md']}px; }}
 QFrame#Sidebar {{ background: {p.bg}; border-right: 1px solid {p.border}; }}
 QFrame#Divider {{ background: {p.border}; max-height: 1px; min-height: 1px; border: none; }}
 
