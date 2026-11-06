@@ -11,3 +11,18 @@ def app():
     from PySide6.QtWidgets import QApplication
 
     return QApplication.instance() or QApplication([])
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_widgets(request):
+    """Destroy leftover widgets after each test so Qt tears down cleanly."""
+    yield
+    if "app" not in request.fixturenames:
+        return
+    from PySide6.QtWidgets import QApplication
+
+    app = QApplication.instance()
+    for widget in app.topLevelWidgets():
+        widget.close()
+        widget.deleteLater()
+    app.processEvents()

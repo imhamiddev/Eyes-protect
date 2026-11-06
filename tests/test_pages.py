@@ -59,13 +59,15 @@ def test_settings_page_language_and_theme(engine):
     assert engine.settings.general.theme == "light"
 
 
-def test_home_reflects_stats_and_pause(engine):
+def test_home_reflects_stats_and_pause(engine, app):
     engine.stats.add("breaks", amount=4)
     p = HomePage(engine)
     engine.set_paused(True)
     p.refresh()
     assert p.pause_btn.text() == i18n.tr("home.resume")
     assert p.breaks.number._value == 4
+    p.deleteLater()
+    app.processEvents()
 
 
 def test_exercise_runner_advances_and_finishes(engine):
