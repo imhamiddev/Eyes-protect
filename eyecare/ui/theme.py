@@ -119,6 +119,12 @@ class ThemeManager(QObject):
         self._language = language
         self.changed.emit()
 
+    def apply(self, palette: str, language: str) -> None:
+        """Set palette and language together and notify once."""
+        self._palette = tokens.PALETTES.get(palette, tokens.DARK)
+        self._language = language
+        self.changed.emit()
+
     def qss(self) -> str:
         return build_qss(self._palette, self._language)
 

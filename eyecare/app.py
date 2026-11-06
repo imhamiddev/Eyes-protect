@@ -72,10 +72,8 @@ class EyeCareApp:
         i18n.set_language(lang)
         self.qt.setLayoutDirection(Qt.LayoutDirection.RightToLeft if i18n.is_rtl()
                                    else Qt.LayoutDirection.LeftToRight)
-        theme._palette = __import__("eyecare.ui.tokens", fromlist=["PALETTES"]).PALETTES[self._palette_name()]
-        theme._language = lang
+        theme.apply(self._palette_name(), lang)
         self.qt.setStyleSheet(theme.qss())
-        theme.changed.emit()
         self._applied = (self._palette_name(), lang)
         return language_changed
 
