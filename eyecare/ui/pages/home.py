@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QGridLayout, QHBoxLayout, QVBoxLayout, QWidget
 
 from eyecare.core import i18n
@@ -28,9 +29,9 @@ class HomePage(Page):
         hl.setSpacing(16)
         hl.addWidget(label(i18n.tr("home.next_break"), "Caption"))
         self.ring = Ring(230, 11)
-        hl.addWidget(self.ring, 0, __import__("PySide6.QtCore", fromlist=["Qt"]).Qt.AlignmentFlag.AlignHCenter)
+        hl.addWidget(self.ring, 0, Qt.AlignmentFlag.AlignHCenter)
         self.status = label("", "Muted")
-        hl.addWidget(self.status, 0, __import__("PySide6.QtCore", fromlist=["Qt"]).Qt.AlignmentFlag.AlignHCenter)
+        hl.addWidget(self.status, 0, Qt.AlignmentFlag.AlignHCenter)
         buttons = QHBoxLayout()
         buttons.setSpacing(10)
         self.break_btn = primary_button(i18n.tr("home.take_break"), "coffee")
