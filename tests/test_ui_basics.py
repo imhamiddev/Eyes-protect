@@ -2,14 +2,8 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtWidgets import QApplication  # noqa: E402
-
 from eyecare.ui import fonts, icons, tokens  # noqa: E402
 
-
-@pytest.fixture(scope="module")
-def app():
-    return QApplication.instance() or QApplication([])
 
 
 def test_palettes_are_complete_and_share_accent():
