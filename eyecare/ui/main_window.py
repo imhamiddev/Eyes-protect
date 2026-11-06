@@ -1,7 +1,7 @@
 """Main window: sidebar navigation + stacked pages."""
 from __future__ import annotations
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, QTimer
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QButtonGroup, QFrame, QHBoxLayout, QLabel, QMainWindow, QPushButton, QStackedWidget, QVBoxLayout,
@@ -116,7 +116,6 @@ class MainWindow(QMainWindow):
 
         row.addWidget(side)
         row.addWidget(self.stack, 1)
-        self._fade = QPropertyAnimation(self.stack, b"pos")  # placeholder; see go()
 
     # -- behaviour ----------------------------------------------------------
     def go(self, index: int) -> None:

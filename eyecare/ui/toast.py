@@ -38,7 +38,8 @@ class Toast(QWidget):
         head = QVBoxLayout()
         head.setSpacing(2)
         head.addWidget(label(title, "Title"))
-        head.addWidget(label(body, "Muted", wrap=True))
+        self.body_label = label(body, "Muted", wrap=True)
+        head.addWidget(self.body_label)
         close = IconButton("x", size=14)
         close.setFixedSize(28, 28)
         close.clicked.connect(self.dismiss)
@@ -77,6 +78,9 @@ class Toast(QWidget):
         self._ticker.timeout.connect(self._advance)
 
     # -- behaviour --------------------------------------------------------
+    def set_body(self, text: str) -> None:
+        self.body_label.setText(text)
+
     def _act(self, callback: Callable[[], None]) -> None:
         try:
             callback()
