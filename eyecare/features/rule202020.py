@@ -1,6 +1,7 @@
 """20-20-20 rule state machine (pure logic, no Qt)."""
 from __future__ import annotations
 
+from dataclasses import replace
 from enum import Enum
 
 from eyecare.core.config import Rule202020 as Rule202020Settings
@@ -25,7 +26,7 @@ class Phase(Enum):
 
 class Rule202020:
     def __init__(self, cfg: Rule202020Settings):
-        self.cfg = cfg
+        self.cfg = replace(cfg)  # private snapshot: the UI mutates the live settings
         self.phase = Phase.WORKING
         self.paused = False
         self.work = Countdown(cfg.interval_min * 60)
@@ -37,7 +38,7 @@ class Rule202020:
     # -- configuration ----------------------------------------------------
     def reload(self, cfg: Rule202020Settings) -> None:
         old = self.cfg
-        self.cfg = cfg
+        self.cfg = cfg = replace(cfg)
         if cfg.interval_min != old.interval_min:
             self.work.start(cfg.interval_min * 60)
             self.work.running = self.phase == Phase.WORKING

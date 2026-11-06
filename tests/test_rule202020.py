@@ -87,3 +87,12 @@ def test_reload_changes_interval():
     rule = make()
     rule.reload(Cfg(interval_min=2, break_seconds=5, snooze_min=1))
     assert rule.seconds_to_break == 120
+
+
+def test_reload_detects_change_on_shared_settings_object():
+    """The UI mutates the live settings object, then calls reload() with it."""
+    live = Cfg(interval_min=1, break_seconds=5, snooze_min=1)
+    rule = r.Rule202020(live)
+    live.interval_min = 3
+    rule.reload(live)
+    assert rule.seconds_to_break == 180
