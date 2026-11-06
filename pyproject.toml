@@ -1,0 +1,17 @@
+[project]
+name = "eyes-protect"
+version = "0.1.0"
+description = "Eye Care - a quiet Windows companion that protects your eyes."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dependencies = ["PySide6-Essentials>=6.6"]
+
+[project.gui-scripts]
+eyecare = "eyecare.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["eyecare*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
