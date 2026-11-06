@@ -1,0 +1,89 @@
+from eyecare.core.config import Rule202020 as Cfg
+from eyecare.features import rule202020 as r
+
+
+def make(**kw):
+    return r.Rule202020(Cfg(interval_min=1, break_seconds=5, snooze_min=1, **kw))
+
+
+def run(rule, seconds, idle=0.0):
+    events = []
+    for _ in range(seconds):
+        events += rule.tick(1.0, idle)
+    return events
+
+
+def test_prompt_after_interval():
+    rule = make()
+    assert run(rule, 60) == [r.PROMPT]
+    assert rule.phase == r.Phase.PROMPT
+
+
+def test_full_cycle():
+    rule = make()
+    run(rule, 60)
+    assert rule.start_break() == [r.BREAK_START]
+    assert run(rule, 5) == [r.BREAK_DONE]
+    assert rule.phase == r.Phase.WORKING and rule.seconds_to_break == 60
+
+
+def test_snooze_returns_to_working():
+    rule = make()
+    run(rule, 60)
+    assert rule.snooze() == [r.SNOOZED]
+    assert rule.phase == r.Phase.WORKING and rule.seconds_to_break == 60
+
+
+def test_prompt_times_out_into_snooze():
+    rule = make()
+    run(rule, 60)
+    assert r.SNOOZED in run(rule, r.PROMPT_TIMEOUT_SECONDS)
+    assert rule.phase == r.Phase.WORKING
+
+
+def test_break_lock_skips_prompt():
+    rule = make(use_break_lock=True)
+    assert run(rule, 60) == [r.BREAK_START]
+    assert rule.phase == r.Phase.BREAK
+
+
+def test_skip_break():
+    rule = make(use_break_lock=True)
+    run(rule, 60)
+    assert rule.skip_break() == [r.BREAK_SKIPPED]
+    assert rule.phase == r.Phase.WORKING
+
+
+def test_natural_break_resets_once_and_holds_clock():
+    rule = make()
+    run(rule, 30)
+    assert rule.seconds_to_break == 30
+    assert run(rule, 1, idle=6) == [r.NATURAL_BREAK]
+    assert rule.seconds_to_break == 60
+    assert run(rule, 20, idle=30) == []  # still away
+    assert rule.seconds_to_break == 60
+
+
+def test_natural_break_can_trigger_again_after_return():
+    rule = make()
+    run(rule, 1, idle=6)
+    run(rule, 3, idle=0)
+    assert run(rule, 1, idle=6) == [r.NATURAL_BREAK]
+
+
+def test_natural_break_detection_can_be_disabled():
+    rule = make(detect_natural_breaks=False)
+    assert run(rule, 1, idle=100) == []
+
+
+def test_paused_does_nothing():
+    rule = make()
+    rule.set_paused(True)
+    assert run(rule, 120) == []
+    assert rule.seconds_to_break == 60
+
+
+def test_reload_changes_interval():
+    rule = make()
+    rule.reload(Cfg(interval_min=2, break_seconds=5, snooze_min=1))
+    assert rule.seconds_to_break == 120
