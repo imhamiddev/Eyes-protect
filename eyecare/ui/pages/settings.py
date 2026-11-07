@@ -17,10 +17,12 @@ class SettingsPage(Page):
         self.theme = Segmented([tr("set.dark"), tr("set.light"), tr("set.system")])
         self.lang = Dropdown(["English", "فارسی"])
         self.autostart = Toggle()
+        self.animations = Toggle()
         self.card(
             SettingRow(tr("set.theme"), "", self.theme),
             SettingRow(tr("set.language"), "", self.lang),
             SettingRow(tr("set.autostart"), tr("set.autostart_desc"), self.autostart),
+            SettingRow(tr("set.animations"), tr("set.animations_desc"), self.animations),
         )
         self.section(tr("set.about"))
         self.card(SettingRow(APP_NAME, f"v{__version__}", None))
@@ -28,6 +30,7 @@ class SettingsPage(Page):
         self.theme.changed.connect(self._save)
         self.lang.currentIndexChanged.connect(self._save)
         self.autostart.toggled.connect(self._save)
+        self.animations.toggled.connect(self._save)
         self.load()
 
     def load(self) -> None:
@@ -36,6 +39,7 @@ class SettingsPage(Page):
         self.theme.set_index(THEMES.index(g.theme) if g.theme in THEMES else 0, emit=False)
         self.lang.setCurrentIndex(LANGS.index(g.language) if g.language in LANGS else 0)
         self.autostart.setChecked(g.autostart)
+        self.animations.setChecked(g.animations)
         self._loading = False
 
     def _save(self, *_args) -> None:
@@ -45,4 +49,5 @@ class SettingsPage(Page):
         g.theme = THEMES[self.theme.index()]
         g.language = LANGS[self.lang.currentIndex()]
         g.autostart = self.autostart.isChecked()
+        g.animations = self.animations.isChecked()
         self.engine.commit_settings()
