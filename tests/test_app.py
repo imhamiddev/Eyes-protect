@@ -85,3 +85,14 @@ def test_blink_and_water_toasts(ea):
     ea.on_blink()
     ea.on_water()
     assert ea.toasts.count() == 2 and ea.engine.stats.get("blinks") == 1
+
+
+def test_animations_switch_is_applied_globally(ea):
+    from eyecare.ui import motion
+
+    ea.engine.settings.general.animations = False
+    ea.engine.commit_settings()
+    assert motion.enabled() is False
+    ea.engine.settings.general.animations = True
+    ea.engine.commit_settings()
+    assert motion.enabled() is True
