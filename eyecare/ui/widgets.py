@@ -443,7 +443,7 @@ class TimeField(QWidget):
         sep = label(":")
         sep.setObjectName("Title")
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(8, 4, 8, 4)
+        lay.setContentsMargins(8, 2, 8, 2)
         lay.setSpacing(4)
         lay.addWidget(self._hour[0])
         lay.addWidget(sep)
@@ -457,7 +457,7 @@ class TimeField(QWidget):
         v.setSpacing(0)
         up, down = IconButton("plus", size=12), IconButton("minus", size=12)
         for b in (up, down):
-            b.setFixedSize(34, 20)
+            b.setFixedSize(34, 16)
         text = label("00")
         text.setObjectName("Title")
         text.setAlignment(Qt.AlignmentFlag.AlignCenter)

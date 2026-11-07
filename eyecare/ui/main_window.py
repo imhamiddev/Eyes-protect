@@ -120,6 +120,7 @@ class MainWindow(QMainWindow):
     # -- behaviour ----------------------------------------------------------
     def go(self, index: int) -> None:
         self.stack.setCurrentIndex(index)
+        self.nav[index].setChecked(True)
         self.pages[index].load()
         self.pages[index].refresh()
 
