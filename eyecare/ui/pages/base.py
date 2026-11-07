@@ -1,13 +1,47 @@
 """Shared page scaffolding: scrollable column with a title header."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QFrame, QScrollArea, QVBoxLayout, QWidget
+from PySide6.QtCore import QEasingCurve, Qt, QVariantAnimation
+from PySide6.QtWidgets import QFrame, QLayout, QScrollArea, QVBoxLayout, QWidget
 
 from eyecare.core import i18n
 from eyecare.engine import Engine
 
+from .. import motion
 from ..widgets import Card, divider, label
+
+
+class SmoothScrollArea(QScrollArea):
+    """Mouse-wheel scrolling that eases to its target instead of jumping."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._target = 0
+        self._anim = QVariantAnimation(self)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._anim.valueChanged.connect(lambda v: self.verticalScrollBar().setValue(int(v)))
+
+    def wheelEvent(self, e) -> None:  # noqa: N802
+        bar = self.verticalScrollBar()
+        if motion.ms(1) == 0 or e.angleDelta().y() == 0:
+            return super().wheelEvent(e)
+        base = self._target if self._anim.state() == QVariantAnimation.State.Running else bar.value()
+        self._target = max(bar.minimum(), min(bar.maximum(), int(base - e.angleDelta().y() * 0.9)))
+        self._anim.stop()
+        self._anim.setDuration(260)
+        self._anim.setStartValue(float(bar.value()))
+        self._anim.setEndValue(float(self._target))
+        self._anim.start()
+        e.accept()
+
+
+def _collect_widgets(layout: QLayout, out: list[QWidget]) -> None:
+    for i in range(layout.count()):
+        item = layout.itemAt(i)
+        if item.widget() is not None:
+            out.append(item.widget())
+        elif item.layout() is not None:
+            _collect_widgets(item.layout(), out)
 
 
 class Page(QWidget):
@@ -17,7 +51,7 @@ class Page(QWidget):
         self._loading = False
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
-        scroll = QScrollArea()
+        scroll = SmoothScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -56,3 +90,10 @@ class Page(QWidget):
 
     def refresh(self) -> None:
         """Per-second UI refresh (override if needed)."""
+
+    def play_enter(self) -> None:
+        """Staggered fade-in of the page's blocks."""
+        blocks: list[QWidget] = []
+        _collect_widgets(self.col, blocks)
+        for i, w in enumerate(blocks):
+            motion.fade_in(w, delay=min(i, 8) * 45, duration=320)

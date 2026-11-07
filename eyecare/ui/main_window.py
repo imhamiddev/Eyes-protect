@@ -1,7 +1,7 @@
 """Main window: sidebar navigation + stacked pages."""
 from __future__ import annotations
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QButtonGroup, QFrame, QHBoxLayout, QLabel, QMainWindow, QPushButton, QStackedWidget, QVBoxLayout,
@@ -19,7 +19,9 @@ from .pages.display import DisplayPage
 from .pages.exercises import ExercisesPage
 from .pages.home import HomePage
 from .pages.settings import SettingsPage
-from .theme import current, theme
+from . import motion
+from .controls import AnimatedButton
+from .theme import theme
 from .widgets import Toggle, label
 
 NAV = [
@@ -31,20 +33,14 @@ NAV = [
 ]
 
 
-class NavButton(QPushButton):
+class NavButton(AnimatedButton):
     def __init__(self, text: str, icon_name: str):
-        super().__init__(f"  {text}")
-        self.setObjectName("NavItem")
+        super().__init__(text, icon_name, "nav", align="start")
+        self.setMinimumHeight(40)
         self.setCheckable(True)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._icon_name = icon_name
-        self.setIconSize(QSize(18, 18))
-        self.toggled.connect(lambda _: self.refresh_icon())
-        self.refresh_icon()
 
     def refresh_icon(self) -> None:
-        p = current()
-        self.setIcon(icons.icon(self._icon_name, p.accent if self.isChecked() else p.text_muted, 18))
+        self.update()
 
 
 class MainWindow(QMainWindow):
@@ -56,6 +52,7 @@ class MainWindow(QMainWindow):
         self.resize(tokens.SIZE["window_w"], tokens.SIZE["window_h"])
         self.setMinimumSize(820, 560)
         self.quitting = False
+        self._shown_once = False
         self.pages: list[QWidget] = []
         self._build()
         engine.state_changed.connect(self._refresh)
@@ -93,6 +90,7 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         for i, (key, icon_name, cls) in enumerate(NAV):
             btn = NavButton(tr(key), icon_name)
+            btn.setSizePolicy(btn.sizePolicy().horizontalPolicy(), btn.sizePolicy().verticalPolicy())
             self.group.addButton(btn, i)
             self.nav.append(btn)
             sl.addWidget(btn)
@@ -119,10 +117,13 @@ class MainWindow(QMainWindow):
 
     # -- behaviour ----------------------------------------------------------
     def go(self, index: int) -> None:
+        changed = self.stack.currentIndex() != index
         self.stack.setCurrentIndex(index)
         self.nav[index].setChecked(True)
         self.pages[index].load()
         self.pages[index].refresh()
+        if changed and self.isVisible():
+            self.pages[index].play_enter()
 
     def _refresh(self) -> None:
         if self.isVisible():
@@ -151,6 +152,20 @@ class MainWindow(QMainWindow):
         old.deleteLater()
         self.setLayoutDirection(Qt.LayoutDirection.RightToLeft if i18n.is_rtl()
                                 else Qt.LayoutDirection.LeftToRight)
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        if not self._shown_once:
+            self._shown_once = True
+            self.pages[self.stack.currentIndex()].play_enter()
+            if motion.ms(1):
+                self.setWindowOpacity(0.0)
+                self._open_anim = QPropertyAnimation(self, b"windowOpacity", self)
+                self._open_anim.setDuration(280)
+                self._open_anim.setStartValue(0.0)
+                self._open_anim.setEndValue(1.0)
+                self._open_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+                self._open_anim.start()
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
         if self.quitting:
