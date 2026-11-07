@@ -9,7 +9,8 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWi
 
 from . import icons, tokens
 from .theme import current
-from .widgets import IconButton, label, qcolor
+from . import motion
+from .widgets import IconButton, label, primary_button, qcolor, secondary_button
 
 Action = tuple[str, Callable[[], None], bool]  # (text, callback, is_primary)
 
@@ -59,20 +60,15 @@ class Toast(QWidget):
             row.setSpacing(8)
             row.addStretch(1)
             for text, callback, primary in actions:
-                b = QPushButton(text)
-                b.setCursor(Qt.CursorShape.PointingHandCursor)
-                if primary:
-                    b.setObjectName("Primary")
+                b = primary_button(text) if primary else secondary_button(text)
                 b.setMinimumHeight(34)
                 b.clicked.connect(lambda _=False, cb=callback: self._act(cb))
                 row.addWidget(b)
             root.addLayout(row)
 
         self._fade = QPropertyAnimation(self, b"windowOpacity", self)
-        self._fade.setDuration(tokens.MOTION["base"])
         self._slide = QPropertyAnimation(self, b"pos", self)
-        self._slide.setDuration(tokens.MOTION["slow"])
-        self._slide.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._slide.setEasingCurve(QEasingCurve.Type.OutBack)
         self._ticker = QTimer(self)
         self._ticker.setInterval(100)
         self._ticker.timeout.connect(self._advance)
@@ -101,17 +97,28 @@ class Toast(QWidget):
         self.move(start)
         self.setWindowOpacity(0.0)
         self.show()
-        self._fade.setStartValue(0.0)
-        self._fade.setEndValue(1.0)
-        self._fade.start()
-        self._slide.setStartValue(start)
-        self._slide.setEndValue(target)
-        self._slide.start()
+        if motion.ms(1) == 0:
+            self.move(target)
+            self.setWindowOpacity(1.0)
+        else:
+            self._fade.setDuration(tokens.MOTION["base"])
+            self._fade.setStartValue(0.0)
+            self._fade.setEndValue(1.0)
+            self._fade.start()
+            self._slide.setDuration(420)
+            self._slide.setStartValue(start)
+            self._slide.setEndValue(target)
+            self._slide.start()
         if self._timeout:
             self._ticker.start()
 
     def move_to(self, target: QPoint) -> None:
         self._slide.stop()
+        if motion.ms(1) == 0:
+            self.move(target)
+            return
+        self._slide.setDuration(tokens.MOTION["slow"])
+        self._slide.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._slide.setStartValue(self.pos())
         self._slide.setEndValue(target)
         self._slide.start()
@@ -122,9 +129,19 @@ class Toast(QWidget):
         self._closing = True
         self._ticker.stop()
         self._fade.stop()
+        self._fade.finished.connect(self._finish)
+        if motion.ms(1) == 0:
+            self._finish()
+            return
+        self._slide.stop()
+        self._slide.setDuration(tokens.MOTION["base"])
+        self._slide.setEasingCurve(QEasingCurve.Type.InCubic)
+        self._slide.setStartValue(self.pos())
+        self._slide.setEndValue(self.pos() + QPoint(40, 0))
+        self._slide.start()
+        self._fade.setDuration(tokens.MOTION["base"])
         self._fade.setStartValue(self.windowOpacity())
         self._fade.setEndValue(0.0)
-        self._fade.finished.connect(self._finish)
         self._fade.start()
 
     def _finish(self) -> None:
