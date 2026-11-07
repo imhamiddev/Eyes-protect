@@ -122,3 +122,16 @@ def set_system_light_theme(light: bool) -> bool:
         return True
     except OSError:
         return False
+
+
+_mutex_handles: list = []
+
+
+def create_single_instance_mutex(name: str = "EyeCareSingleInstanceMutex") -> bool:
+    """Create a named mutex so the installer can detect a running app."""
+    if not IS_WINDOWS:
+        return False
+    handle = _kernel32.CreateMutexW(None, False, name)
+    if handle:
+        _mutex_handles.append(handle)  # keep it alive for the process lifetime
+    return bool(handle)

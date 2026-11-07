@@ -1,4 +1,4 @@
-# PyInstaller spec: one-file, windowed (no console) build.
+# PyInstaller spec: windowed one-folder build (fast start-up; packaged by the installer).
 from pathlib import Path
 
 root = Path(SPECPATH)
@@ -10,9 +10,11 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 exe = EXE(
-    pyz, a.scripts, a.binaries, a.datas, [],
+    pyz, a.scripts, [],
+    exclude_binaries=True,
     name="EyeCare",
     console=False,
     icon=str(root / "eyecare" / "assets" / "eyecare.ico"),
     upx=False,
 )
+coll = COLLECT(exe, a.binaries, a.datas, name="EyeCare", upx=False)

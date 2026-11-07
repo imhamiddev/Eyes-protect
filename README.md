@@ -19,9 +19,14 @@ python -m eyecare
 ```
 `--background` starts hidden in the tray (this is what autostart uses).
 
-## Build the exe
-Push a tag like `v0.1.0` (or run the *Build Windows exe* workflow) and download `EyeCare.exe`,
-or locally: `pip install -r requirements-dev.txt && pyinstaller eyecare.spec`.
+## Install
+Download **EyeCare-Setup.exe** from the [latest release](https://github.com/imhamiddev/Eyes-protect/releases/latest)
+and run it. It installs per-user (no admin rights), adds a Start-menu entry (optional desktop shortcut),
+starts Eye Care with Windows and registers an uninstaller in *Apps & features*.
+
+## Build the installer
+Push a tag like `v0.2.0` (or run the *Build Windows installer* workflow). Locally:
+`pyinstaller eyecare.spec`, then compile `installer/eyecare.iss` with Inno Setup 6.
 
 ## Notes
 Night light and dimmer use the display gamma ramp; Windows limits how dark it can go, so

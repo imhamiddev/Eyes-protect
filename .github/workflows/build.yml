@@ -1,4 +1,4 @@
-name: Build Windows exe
+name: Build Windows installer
 on:
   push:
     tags: ["v*"]
@@ -18,12 +18,20 @@ jobs:
         run: |
           python -m pytest -q --tb=line -p no:cacheprovider > out.txt 2>&1 || { echo "::error::$(grep -E 'Error|FAILED|assert|failed|passed' out.txt | head -12 | tr '\n' '|')"; exit 1; }
       - run: pyinstaller --noconfirm eyecare.spec
+      - name: Read version
+        id: ver
+        shell: bash
+        run: echo "version=$(python -c 'import eyecare; print(eyecare.__version__)')" >> "$GITHUB_OUTPUT"
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+      - name: Build installer
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=${{ steps.ver.outputs.version }} installer\eyecare.iss'
       - uses: actions/upload-artifact@v4
         with:
-          name: EyeCare-windows
-          path: dist/EyeCare.exe
+          name: EyeCare-Setup
+          path: dist-installer/EyeCare-Setup.exe
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/EyeCare.exe
+          files: dist-installer/EyeCare-Setup.exe
