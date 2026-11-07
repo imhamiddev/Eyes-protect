@@ -1,16 +1,18 @@
 """Full-screen break screen (Break Lock) shown on every monitor."""
 from __future__ import annotations
 
+import math
 import random
 
-from PySide6.QtCore import QTimer, Qt, Signal
-from PySide6.QtGui import QGuiApplication, QKeyEvent, QPainter
+from PySide6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, QRect, QTimer, Qt, QVariantAnimation, Signal
+from PySide6.QtGui import QColor, QGuiApplication, QKeyEvent, QPainter, QRadialGradient
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from eyecare.core import i18n
 from eyecare.core.exercises import EXERCISES, Exercise
 from eyecare.core.timeutil import format_mmss
 
+from . import motion
 from .theme import current
 from .widgets import Ring, label, qcolor, secondary_button
 
@@ -63,6 +65,17 @@ class BreakOverlay(QWidget):
         lay.addWidget(self.step, 0, Qt.AlignmentFlag.AlignHCenter)
         lay.addSpacing(16)
         lay.addWidget(self.skip_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+        self._fade = QPropertyAnimation(self, b"windowOpacity", self)
+        self._fade.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._fade.finished.connect(self._after_fade)
+        self._breath = QVariantAnimation(self)
+        self._breath.setStartValue(0.0)
+        self._breath.setEndValue(1.0)
+        self._breath.setDuration(4200)
+        self._breath.setLoopCount(-1)
+        self._breath.setEasingCurve(QEasingCurve.Type.InOutSine)
+        self._breath_v = 0.0
+        self._breath.valueChanged.connect(self._on_breath)
         self._skip_timer = QTimer(self)
         self._skip_timer.setSingleShot(True)
         self._skip_timer.timeout.connect(lambda: self.skip_btn.setEnabled(True))
@@ -88,21 +101,59 @@ class BreakOverlay(QWidget):
         self._refresh()
         self._cover_screens()
         self._active = True
+        self._fade.stop()
+        if motion.ms(1):
+            self.setWindowOpacity(0.0)
+        else:
+            self.setWindowOpacity(1.0)
         self.showFullScreen()
         self.activateWindow()
         self.setFocus()
+        if motion.ms(1):
+            self._fade.setDuration(450)
+            self._fade.setStartValue(0.0)
+            self._fade.setEndValue(1.0)
+            self._fade.start()
+            self._breath.start()
 
     def update_left(self, seconds: int) -> None:
         self._left = max(0, seconds)
         self._refresh()
 
     def end(self) -> None:
+        was_active = self._active
         self._active = False
         self._skip_timer.stop()
+        self._breath.stop()
+        if was_active and motion.ms(1) and self.isVisible():
+            self._fade.stop()
+            self._fade.setDuration(300)
+            self._fade.setStartValue(self.windowOpacity())
+            self._fade.setEndValue(0.0)
+            self._fade.start()
+        else:
+            self._fade.stop()
+            self._hide_now()
+
+    def _after_fade(self) -> None:
+        if not self._active:
+            self._hide_now()
+
+    def _hide_now(self) -> None:
         self.hide()
+        self.setWindowOpacity(1.0)
         for c in self._covers:
             c.close()
         self._covers.clear()
+
+    def _on_breath(self, v) -> None:
+        self._breath_v = float(v)
+        self.update(self._halo_rect())
+
+    def _halo_rect(self) -> QRect:
+        c = self.ring.mapTo(self, self.ring.rect().center())
+        r = 260
+        return QRect(c.x() - r, c.y() - r, 2 * r, 2 * r)
 
     # -- internals ------------------------------------------------------------
     def _refresh(self) -> None:
@@ -143,4 +194,19 @@ class BreakOverlay(QWidget):
             super().keyPressEvent(e)
 
     def paintEvent(self, _e) -> None:  # noqa: N802
-        QPainter(self).fillRect(self.rect(), qcolor(current().overlay if self.isFullScreen() else current().bg))
+        p = QPainter(self)
+        p.fillRect(self.rect(), qcolor(current().overlay if self.isFullScreen() else current().bg))
+        if self._active and motion.ms(1):
+            # slow "breathing" halo behind the ring: inhale/exhale pacing for relaxed eyes
+            c = self.ring.mapTo(self, self.ring.rect().center())
+            wave = 0.5 - 0.5 * math.cos(self._breath_v * 2 * 3.14159265)
+            radius = 150 + 70 * wave
+            grad = QRadialGradient(QPointF(c), radius)
+            accent = QColor(qcolor(current().accent))
+            accent.setAlpha(int(34 + 30 * wave))
+            grad.setColorAt(0.55, accent)
+            accent.setAlpha(0)
+            grad.setColorAt(1.0, accent)
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(grad)
+            p.drawEllipse(QPointF(c), radius, radius)

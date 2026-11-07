@@ -22,6 +22,7 @@ class General:
     language: str = "en"  # en | fa
     autostart: bool = True
     start_minimized: bool = True
+    animations: bool = True
 
 
 @dataclass

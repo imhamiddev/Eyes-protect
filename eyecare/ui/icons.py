@@ -1,8 +1,10 @@
 """Lucide-style outline icons (24x24 grid, 2px round strokes), rendered via SVG."""
 from __future__ import annotations
 
+from functools import lru_cache
+
 from PySide6.QtCore import QByteArray, QRectF, Qt
-from PySide6.QtGui import QIcon, QImage, QPainter, QPixmap
+from PySide6.QtGui import QColor, QIcon, QImage, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 _P = {
@@ -49,6 +51,7 @@ def svg_markup(name: str, color: str, stroke: float = 2.0) -> str:
     )
 
 
+@lru_cache(maxsize=256)
 def pixmap(name: str, color: str, size: int = 20, stroke: float = 2.0, dpr: float = 2.0) -> QPixmap:
     renderer = QSvgRenderer(QByteArray(svg_markup(name, color, stroke).encode()))
     px = int(size * dpr)
@@ -65,3 +68,17 @@ def pixmap(name: str, color: str, size: int = 20, stroke: float = 2.0, dpr: floa
 
 def icon(name: str, color: str, size: int = 20, stroke: float = 2.0) -> QIcon:
     return QIcon(pixmap(name, color, size, stroke))
+
+
+def tinted(name: str, color: QColor, size: int = 18, stroke: float = 2.0, dpr: float = 2.0) -> QPixmap:
+    """Icon recoloured at paint time (cheap, so colours can be animated)."""
+    base = pixmap(name, "#ffffff", size, stroke, dpr)
+    out = QPixmap(base.size())
+    out.setDevicePixelRatio(dpr)
+    out.fill(Qt.GlobalColor.transparent)
+    p = QPainter(out)
+    p.drawPixmap(0, 0, base)
+    p.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+    p.fillRect(out.rect(), color)
+    p.end()
+    return out

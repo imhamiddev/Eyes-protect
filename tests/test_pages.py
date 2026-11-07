@@ -85,3 +85,22 @@ def test_exercises_page_lists_all(engine):
     runner = p.run(EXERCISES[1])
     runner.timer.stop()
     runner.close()
+
+
+def test_settings_animations_switch_updates_setting(engine):
+    p = SettingsPage(engine)
+    p.animations.setChecked(False)
+    assert engine.settings.general.animations is False
+
+
+def test_pages_enter_animation_is_safe(engine):
+    from eyecare.ui import motion
+
+    motion.set_enabled(True)
+    for cls in (HomePage, CarePage, DisplayPage, SettingsPage, ExercisesPage):
+        page = cls(engine)
+        page.resize(900, 600)
+        page.show()
+        page.play_enter()
+        page.grab()
+        page.close()

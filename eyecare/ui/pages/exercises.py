@@ -9,7 +9,7 @@ from eyecare.core.exercises import EXERCISES, Exercise
 from eyecare.core.i18n import tr
 from eyecare.core.timeutil import format_mmss
 
-from .. import icons
+from .. import icons, motion
 from ..theme import current
 from ..widgets import Card, Ring, label, primary_button, secondary_button
 from .base import Page
@@ -64,6 +64,9 @@ class ExerciseRunner(QDialog):
         self.timer.timeout.connect(self.tick)
         self._render()
         self.timer.start(1000)
+        motion.fade_in(self.ring, 0, 360)
+        motion.fade_in(self.title, 80, 360)
+        motion.fade_in(self.text, 160, 360)
 
     def _render(self) -> None:
         step = self.exercise.steps[self.step_index]
@@ -84,9 +87,11 @@ class ExerciseRunner(QDialog):
                 self.text.setText(tr("ex.done"))
                 self.ring.set_progress(1.0)
                 self.ring.set_text("✓")
+                motion.fade_in(self.text, 0, 380)
                 return
             self.step_index += 1
             self.step_left = self.exercise.steps[self.step_index].seconds
+            motion.fade_in(self.text, 0, 380)
         self._render()
 
 

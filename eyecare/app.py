@@ -11,7 +11,7 @@ from eyecare.core import i18n, winapi
 from eyecare.core.config import config_dir
 from eyecare.engine import Engine
 from eyecare.features.rule202020 import Phase
-from eyecare.ui import brand, fonts
+from eyecare.ui import brand, fonts, motion
 from eyecare.ui.break_overlay import BreakOverlay
 from eyecare.ui.main_window import MainWindow
 from eyecare.ui.theme import theme
@@ -35,6 +35,7 @@ class EyeCareApp:
         self._mini_toast = None
         self._applied: tuple[str, str] | None = None
 
+        motion.set_enabled(self.engine.settings.general.animations)
         self.apply_appearance()
         self.window = MainWindow(self.engine)
         self.tray = Tray(self.engine)
@@ -78,6 +79,7 @@ class EyeCareApp:
         return language_changed
 
     def on_settings_changed(self) -> None:
+        motion.set_enabled(self.engine.settings.general.animations)
         if self._applied != (self._palette_name(), self.engine.settings.general.language):
             if self.apply_appearance() and self.window:
                 self.window.rebuild()
