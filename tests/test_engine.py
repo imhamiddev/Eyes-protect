@@ -2,16 +2,11 @@ import pytest
 
 pytest.importorskip("PySide6")
 
-from PySide6.QtCore import QCoreApplication  # noqa: E402
 
 from eyecare.core.config import Settings  # noqa: E402
 from eyecare.core.stats import Stats  # noqa: E402
 from eyecare.engine import Engine  # noqa: E402
 
-
-@pytest.fixture(scope="module")
-def app():
-    return QCoreApplication.instance() or QCoreApplication([])
 
 
 def make(tmp_path, **rule):
