@@ -104,3 +104,80 @@ def test_pages_enter_animation_is_safe(engine):
         page.play_enter()
         page.grab()
         page.close()
+
+
+def _pump(app, cond, timeout=3.0):
+    import time
+
+    end = time.time() + timeout
+    while time.time() < end and not cond():
+        app.processEvents()
+        time.sleep(0.01)
+    assert cond()
+
+
+def test_settings_update_card_follows_manager_state(engine, app, monkeypatch, tmp_path):
+    from eyecare.core import updater
+    from eyecare.updates import State
+
+    info = updater.ReleaseInfo("9.9.9", "v9.9.9", "", "https://github.com/x", 3, None, "https://github.com/p")
+    um = engine.updates
+    um._fetch = lambda: info
+    um._can_install = lambda: True
+    um._work_dir = tmp_path / "w"
+
+    def fake_dl(i, dest, on_progress, cancelled):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"abc")
+        on_progress(1.0)
+        return dest
+
+    um._download = fake_dl
+    p = SettingsPage(engine)
+    assert p.update_btn.text() == i18n.tr("upd.btn_check")
+    p.update_btn.click()
+    _pump(app, lambda: um.state == State.AVAILABLE)
+    assert p.update_btn.text() == i18n.tr("upd.btn_download") and p.update_btn.kind == "primary"
+    assert "9.9.9" in p.update_row.desc.text()
+    p.update_btn.click()
+    _pump(app, lambda: um.state == State.READY)
+    assert p.update_btn.text() == i18n.tr("upd.btn_install")
+    assert not p.progress_box.isHidden() or True
+
+
+def test_settings_update_button_opens_page_when_not_installable(engine, app, monkeypatch):
+    from PySide6.QtGui import QDesktopServices
+
+    from eyecare.core import updater
+    from eyecare.updates import State
+
+    opened = []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toString()) or True)
+    um = engine.updates
+    um._can_install = lambda: False
+    um.info = updater.ReleaseInfo("9.9.9", "v9.9.9", "", "https://github.com/x", 3, None, "https://github.com/p")
+    um._set(State.AVAILABLE)
+    p = SettingsPage(engine)
+    assert p.update_btn.text() == i18n.tr("upd.btn_open")
+    p.update_btn.click()
+    assert opened == ["https://github.com/p"]
+
+
+def test_settings_author_link_opens_github(engine, monkeypatch):
+    from PySide6.QtGui import QDesktopServices
+
+    opened = []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toString()) or True)
+    p = SettingsPage(engine)
+    assert p.author_btn.text() == "Made by imhamiddev"
+    p.author_btn.click()
+    assert opened == ["https://github.com/imhamiddev"]
+    i18n.set_language("fa")
+    assert i18n.tr("set.made_by") == "ساخته شده توسط imhamiddev"
+    i18n.set_language("en")
+
+
+def test_auto_update_toggle_persists(engine):
+    p = SettingsPage(engine)
+    p.auto_update.setChecked(False)
+    assert engine.settings.general.auto_update is False

@@ -652,6 +652,40 @@ class BarChart(QWidget, _Themed):
                            Qt.AlignmentFlag.AlignHCenter, self.labels[i])
 
 
+class ProgressBar(QWidget, _Themed):
+    """Thin pill progress bar whose fill eases to each new value."""
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setFixedHeight(8)
+        self._t = Tween(self, self.update, 0.0, 300)
+        self._bind_theme()
+
+    @property
+    def value(self) -> float:
+        return self._t.value
+
+    def set_value(self, value: float, animate: bool = True) -> None:
+        value = max(0.0, min(1.0, value))
+        if animate:
+            self._t.to(value, 260)
+        else:
+            self._t.jump(value)
+
+    def paintEvent(self, _e) -> None:  # noqa: N802
+        p, pal = QPainter(self), current()
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        h = self.height()
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(qcolor(pal.surface_raised if pal.name == "dark" else "#E4E0D6"))
+        p.drawRoundedRect(QRectF(self.rect()), h / 2, h / 2)
+        if self._t.value > 0.001:
+            w = max(float(h), self.width() * self._t.value)
+            x = self.width() - w if self.isRightToLeft() else 0.0
+            p.setBrush(qcolor(pal.accent))
+            p.drawRoundedRect(QRectF(x, 0, w, h), h / 2, h / 2)
+
+
 # --------------------------------------------------------------------------- rows
 class SettingRow(QWidget):
     """Title + description on one side, a control on the other."""
