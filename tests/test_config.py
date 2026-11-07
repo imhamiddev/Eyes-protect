@@ -50,3 +50,11 @@ def test_partial_file_keeps_other_defaults(tmp_path):
     s = load_settings(path)
     assert s.hydration.interval_min == 30
     assert s.rule202020.interval_min == 20
+
+
+def test_update_settings_defaults_and_int_to_float():
+    s = Settings()
+    assert s.general.auto_update is True and s.general.last_update_check == 0.0
+    s2 = settings_from_dict({"general": {"last_update_check": 1700000000, "auto_update": False}})
+    assert s2.general.last_update_check == 1700000000.0 and s2.general.auto_update is False
+    assert settings_from_dict({"general": {"last_update_check": True}}).general.last_update_check == 0.0

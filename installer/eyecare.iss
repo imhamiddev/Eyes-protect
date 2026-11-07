@@ -46,3 +46,5 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\EyeCare.exe"; Description: "Launch Eye Care"; Flags: nowait postinstall skipifsilent
+; Silent installs are in-app updates: bring the app back in the tray.
+Filename: "{app}\EyeCare.exe"; Parameters: "--background"; Flags: nowait skipifnotsilent

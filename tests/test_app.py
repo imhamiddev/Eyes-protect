@@ -96,3 +96,15 @@ def test_animations_switch_is_applied_globally(ea):
     ea.engine.settings.general.animations = True
     ea.engine.commit_settings()
     assert motion.enabled() is True
+
+
+def test_update_ready_shows_toast_and_install_quits(ea):
+    from eyecare.core import updater
+
+    info = updater.ReleaseInfo("9.9.9", "v9.9.9", "", "https://github.com/x", 3, None, "p")
+    ea.on_update_ready(info)
+    assert ea.toasts.count() == 1
+    quits = []
+    ea.engine.updates.quit_requested.connect(lambda: quits.append(1))
+    ea.engine.updates.quit_requested.emit()  # the real quit() runs too (shuts the engine down)
+    assert quits == [1] and ea.window.quitting is True

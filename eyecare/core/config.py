@@ -23,6 +23,8 @@ class General:
     autostart: bool = True
     start_minimized: bool = True
     animations: bool = True
+    auto_update: bool = True
+    last_update_check: float = 0.0
 
 
 @dataclass
@@ -104,8 +106,10 @@ def _merge(target: Any, data: dict) -> None:
         value = data[f.name]
         if is_dataclass(current) and isinstance(value, dict):
             _merge(current, value)
+        elif hints[f.name] is float and isinstance(value, int) and not isinstance(value, bool):
+            setattr(target, f.name, float(value))
         elif isinstance(value, hints[f.name]) and not (
-            hints[f.name] is int and isinstance(value, bool)
+            hints[f.name] in (int, float) and isinstance(value, bool)
         ):
             setattr(target, f.name, value)
 

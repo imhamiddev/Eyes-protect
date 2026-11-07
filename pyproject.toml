@@ -1,6 +1,6 @@
 [project]
 name = "eyes-protect"
-version = "0.2.0"
+version = "0.3.0"
 description = "Eye Care - a quiet Windows companion that protects your eyes."
 readme = "README.md"
 requires-python = ">=3.10"

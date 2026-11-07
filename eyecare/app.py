@@ -52,6 +52,8 @@ class EyeCareApp:
         e.natural_break.connect(self.on_natural_break)
         e.settings_changed.connect(self.on_settings_changed)
         e.state_changed.connect(self._drop_stale_prompt)
+        e.updates.update_ready.connect(self.on_update_ready)
+        e.updates.quit_requested.connect(self.quit)
         self.overlay.skipped.connect(e.skip_break)
 
         self._theme_watch = QTimer()
@@ -173,6 +175,13 @@ class EyeCareApp:
         self.toasts.show("droplet", i18n.tr("toast.water_title"), i18n.tr("toast.water_body"),
                          [(i18n.tr("toast.drank"), self.engine.record_water, True)],
                          timeout_ms=WATER_TOAST_MS)
+
+    def on_update_ready(self, info) -> None:
+        self.toasts.show(
+            "download", i18n.tr("upd.toast_title"),
+            i18n.tr("upd.toast_body").replace("{v}", info.version),
+            [(i18n.tr("upd.toast_install"), self.engine.updates.install, True),
+             (i18n.tr("upd.toast_later"), lambda: None, False)])
 
     def on_natural_break(self) -> None:
         self.toasts.show("check", i18n.tr("break.done"), "", [], timeout_ms=2500)
