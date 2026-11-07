@@ -14,6 +14,7 @@ from eyecare.core.timeutil import now_time
 from eyecare.features import rule202020 as rule_mod
 from eyecare.features.display import DisplayState, compute_display_state, wants_light_theme
 from eyecare.features.interval import IntervalReminder
+from eyecare.updates import UpdateManager
 
 DISPLAY_REAPPLY_SECONDS = 60
 
@@ -52,6 +53,7 @@ class Engine(QObject):
         self._last_applied: tuple | None = None
         self._since_apply = DISPLAY_REAPPLY_SECONDS
         self._last_theme_target: bool | None = None
+        self.updates = UpdateManager(self)
         self._timer = QTimer(self)
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self.on_tick)
@@ -61,6 +63,7 @@ class Engine(QObject):
         self.apply_display(force=True)
         self.sync_autostart()
         self._timer.start()
+        self.updates.start_background()
 
     def shutdown(self) -> None:
         self._timer.stop()
@@ -69,6 +72,10 @@ class Engine(QObject):
         self.stats.save()
 
     # -- settings ---------------------------------------------------------
+    def save_quietly(self) -> None:
+        """Persist settings without re-applying or notifying the UI."""
+        save_settings(self.settings, self._settings_path)
+
     def commit_settings(self) -> None:
         """Call after mutating ``self.settings``; persists and re-applies."""
         s = self.settings
