@@ -26,3 +26,16 @@ def _cleanup_widgets(request):
         widget.close()
         widget.deleteLater()
     app.processEvents()
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_winapi(monkeypatch):
+    """Never touch the real machine (idle time, gamma, registry) from tests."""
+    from eyecare.core import winapi
+
+    monkeypatch.setattr(winapi, "idle_seconds", lambda: 0.0)
+    monkeypatch.setattr(winapi, "set_gamma_ramp", lambda ramp: False)
+    monkeypatch.setattr(winapi, "reset_gamma", lambda: False)
+    monkeypatch.setattr(winapi, "set_autostart", lambda *a, **k: False)
+    monkeypatch.setattr(winapi, "set_system_light_theme", lambda light: False)
+    monkeypatch.setattr(winapi, "system_uses_light_theme", lambda: False)

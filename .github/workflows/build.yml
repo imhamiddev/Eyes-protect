@@ -11,7 +11,10 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - run: pip install -r requirements-dev.txt
-      - run: python -m pytest -q
+      - name: Run tests
+        shell: bash
+        run: |
+          python -m pytest -q --tb=line -p no:cacheprovider > out.txt 2>&1 || { echo "::error::$(grep -E 'Error|FAILED|assert|failed|passed' out.txt | head -12 | tr '\n' '|')"; exit 1; }
       - run: pyinstaller --noconfirm eyecare.spec
       - uses: actions/upload-artifact@v4
         with:
