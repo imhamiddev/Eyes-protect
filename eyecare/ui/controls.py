@@ -354,6 +354,9 @@ class ValueLabel(QWidget):
         except ValueError:
             self._dir = 1
         self._old, self._new = self._new, text
+        if not self.isVisible():
+            self._t.jump(1.0)
+            return
         self._t.jump(0.0)
         self._t.to(1.0)
 

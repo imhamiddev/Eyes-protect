@@ -12,23 +12,9 @@ from PySide6.QtWidgets import (
 )
 
 from . import icons, tokens
+from .controls import AnimatedButton, IconButton, SmoothSlider, ValueLabel  # noqa: F401
+from .motion import Tween, lerp_color as _lerp_color, qcolor, ms, with_alpha  # noqa: F401
 from .theme import current, theme
-
-
-def qcolor(value: str) -> QColor:
-    """Parse '#rrggbb' or 'rgba(r,g,b,a)' (a in 0..1) into a QColor."""
-    value = value.strip()
-    if value.startswith("rgba"):
-        r, g, b, a = [x.strip() for x in value[value.index("(") + 1:value.rindex(")")].split(",")]
-        return QColor(int(r), int(g), int(b), round(float(a) * 255))
-    return QColor(value)
-
-
-def _lerp_color(a: QColor, b: QColor, t: float) -> QColor:
-    return QColor(
-        round(a.red() + (b.red() - a.red()) * t), round(a.green() + (b.green() - a.green()) * t),
-        round(a.blue() + (b.blue() - a.blue()) * t), round(a.alpha() + (b.alpha() - a.alpha()) * t),
-    )
 
 
 class _Themed:
@@ -51,9 +37,35 @@ def label(text: str = "", kind: str | None = None, wrap: bool = False) -> QLabel
 
 
 class Card(QFrame):
-    def __init__(self, parent: QWidget | None = None, flat: bool = False):
+    def __init__(self, parent: QWidget | None = None, flat: bool = False, hoverable: bool = False):
         super().__init__(parent)
-        self.setObjectName("CardFlat" if flat else "Card")
+        self._hoverable = hoverable and not flat
+        self.setObjectName("CardFlat" if flat else ("CardAnim" if self._hoverable else "Card"))
+        if self._hoverable:
+            self._hover = Tween(self, self.update, 0.0, 200)
+            theme.changed.connect(self.update)
+
+    def enterEvent(self, e) -> None:  # noqa: N802
+        if self._hoverable:
+            self._hover.to(1.0)
+        super().enterEvent(e)
+
+    def leaveEvent(self, e) -> None:  # noqa: N802
+        if self._hoverable:
+            self._hover.to(0.0)
+        super().leaveEvent(e)
+
+    def paintEvent(self, e) -> None:  # noqa: N802
+        if not self._hoverable:
+            return super().paintEvent(e)
+        p, pal, h = QPainter(self), current(), self._hover.value
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        bg = _lerp_color(qcolor(pal.surface), qcolor(pal.surface_hover), h * 0.6)
+        border = _lerp_color(qcolor(pal.border), qcolor(pal.accent_soft), h)
+        p.setPen(QPen(border, 1))
+        p.setBrush(bg)
+        r = tokens.RADIUS["lg"]
+        p.drawRoundedRect(QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5), r, r)
 
 
 def divider() -> QFrame:
@@ -63,59 +75,16 @@ def divider() -> QFrame:
     return line
 
 
-class IconButton(QToolButton, _Themed):
-    def __init__(self, name: str, tooltip: str = "", checkable: bool = False,
-                 size: int = 18, parent: QWidget | None = None):
-        super().__init__(parent)
-        self._name, self._size, self._color_key = name, size, "text_muted"
-        self.setCheckable(checkable)
-        self.setToolTip(tooltip)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.setIconSize(QSize(size, size))
-        self._bind_theme()
-        self._refresh()
-
-    def set_icon_name(self, name: str) -> None:
-        self._name = name
-        self._refresh()
-
-    def _refresh(self) -> None:
-        p = current()
-        color = p.accent if self.isChecked() else getattr(p, self._color_key)
-        self.setIcon(icons.icon(self._name, color, self._size))
-
-    def on_theme_changed(self) -> None:
-        self._refresh()
-
-    def nextCheckState(self) -> None:  # noqa: N802
-        super().nextCheckState()
-        self._refresh()
+def primary_button(text: str, icon_name: str | None = None) -> AnimatedButton:
+    return AnimatedButton(text, icon_name, "primary")
 
 
-def primary_button(text: str, icon_name: str | None = None) -> QPushButton:
-    btn = QPushButton(text)
-    btn.setObjectName("Primary")
-    btn.setCursor(Qt.CursorShape.PointingHandCursor)
-    if icon_name:
-        btn.setIcon(icons.icon(icon_name, current().on_accent, 18))
-        btn.setIconSize(QSize(18, 18))
-    return btn
+def secondary_button(text: str, icon_name: str | None = None) -> AnimatedButton:
+    return AnimatedButton(text, icon_name, "secondary")
 
 
-def secondary_button(text: str, icon_name: str | None = None) -> QPushButton:
-    btn = QPushButton(text)
-    btn.setCursor(Qt.CursorShape.PointingHandCursor)
-    if icon_name:
-        btn.setIcon(icons.icon(icon_name, current().text, 18))
-        btn.setIconSize(QSize(18, 18))
-    return btn
-
-
-def ghost_button(text: str) -> QPushButton:
-    btn = QPushButton(text)
-    btn.setObjectName("Ghost")
-    btn.setCursor(Qt.CursorShape.PointingHandCursor)
-    return btn
+def ghost_button(text: str) -> AnimatedButton:
+    return AnimatedButton(text, None, "ghost")
 
 
 # --------------------------------------------------------------------------- toggle
@@ -131,8 +100,9 @@ class Toggle(QAbstractButton, _Themed):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._pos = 1.0 if checked else 0.0
         self._anim = QPropertyAnimation(self, b"position", self)
-        self._anim.setDuration(tokens.MOTION["base"])
-        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutBack)
+        self._hover = Tween(self, self.update, 0.0, 140)
+        self._press = Tween(self, self.update, 0.0, 90)
         self.toggled.connect(self._animate)
         self._bind_theme()
 
@@ -145,8 +115,29 @@ class Toggle(QAbstractButton, _Themed):
 
     position = Property(float, _get_pos, _set_pos)
 
+    def enterEvent(self, e) -> None:  # noqa: N802
+        self._hover.to(1.0)
+        super().enterEvent(e)
+
+    def leaveEvent(self, e) -> None:  # noqa: N802
+        self._hover.to(0.0)
+        self._press.to(0.0)
+        super().leaveEvent(e)
+
+    def mousePressEvent(self, e) -> None:  # noqa: N802
+        self._press.to(1.0)
+        super().mousePressEvent(e)
+
+    def mouseReleaseEvent(self, e) -> None:  # noqa: N802
+        self._press.to(0.0, 200)
+        super().mouseReleaseEvent(e)
+
     def _animate(self, checked: bool) -> None:
         self._anim.stop()
+        self._anim.setDuration(ms(tokens.MOTION["base"] + 60))
+        if self._anim.duration() == 0:
+            self._set_pos(1.0 if checked else 0.0)
+            return
         self._anim.setStartValue(self._pos)
         self._anim.setEndValue(1.0 if checked else 0.0)
         self._anim.start()
@@ -170,16 +161,23 @@ class Toggle(QAbstractButton, _Themed):
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.setPen(QPen(qcolor(pal.accent), 1.5))
             p.drawRoundedRect(rect.adjusted(-1, -1, 1, 1), rect.height() / 2 + 1, rect.height() / 2 + 1)
-        d = rect.height() - 8
+        d = rect.height() - 8 + 1.5 * self._hover.value
+        knob_w = d + 5 * self._press.value
         t = 1 - self._pos if self.isRightToLeft() else self._pos
-        x = rect.left() + 4 + (rect.width() - d - 8) * t
-        knob = qcolor(pal.on_accent) if self._pos > 0.5 else qcolor("#FFFFFF" if pal.name == "light" else pal.text_muted)
+        x = rect.left() + 4 + (rect.width() - knob_w - 8) * t
+        y = rect.top() + (rect.height() - d) / 2
+        base_knob = qcolor("#FFFFFF" if pal.name == "light" else pal.text_muted)
+        color = _lerp_color(base_knob, qcolor(pal.on_accent), self._pos) if enabled else base_knob
         if not enabled:
-            knob.setAlphaF(0.6)
+            color.setAlphaF(0.6)
+        halo = max(self._hover.value * 0.5, self._press.value)
+        if halo > 0.01 and enabled:
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(with_alpha(qcolor(pal.accent), 0.18 * halo))
+            p.drawEllipse(QRectF(x - 4, y - 4, knob_w + 8, d + 8))
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(_lerp_color(qcolor("#FFFFFF" if pal.name == "light" else pal.text_muted),
-                               qcolor(pal.on_accent), self._pos) if enabled else knob)
-        p.drawEllipse(QRectF(x, rect.top() + 4, d, d))
+        p.setBrush(color)
+        p.drawRoundedRect(QRectF(x, y, knob_w, d), d / 2, d / 2)
 
 
 # --------------------------------------------------------------------------- segmented
@@ -347,11 +345,11 @@ class LabeledSlider(QWidget):
         super().__init__(parent)
         self.suffix = suffix
         self.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
-        self.slider = QSlider(Qt.Orientation.Horizontal)
+        self.slider = SmoothSlider()
         self.slider.setRange(minimum, maximum)
         self.slider.setValue(value)
-        self.slider.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.slider.setFixedHeight(tokens.SIZE["slider_h"])
+        self.slider._shown = float(value)
+        self.slider.setFixedHeight(tokens.SIZE["slider_h"] + 10)
         self.value_label = label(f"{value}{suffix}", "Muted")
         self.value_label.setMinimumWidth(52)
         self.value_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -389,10 +387,7 @@ class Stepper(QWidget):
         self.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
         self.minus = IconButton("minus", size=16)
         self.plus = IconButton("plus", size=16)
-        self.text = label(str(value))
-        self.text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.text.setMinimumWidth(40)
-        self.text.setObjectName("Title")
+        self.text = ValueLabel(str(value), 40)
         lay = QHBoxLayout(self)
         lay.setContentsMargins(4, 2, 4, 2)
         lay.setSpacing(2)
@@ -458,9 +453,7 @@ class TimeField(QWidget):
         up, down = IconButton("plus", size=12), IconButton("minus", size=12)
         for b in (up, down):
             b.setFixedSize(34, 16)
-        text = label("00")
-        text.setObjectName("Title")
-        text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        text = ValueLabel("00", 34)
         up.clicked.connect(lambda: setter((getter() + step) % mod))
         down.clicked.connect(lambda: setter((getter() - step) % mod))
         v.addWidget(up)
@@ -506,14 +499,37 @@ class Dropdown(QComboBox, _Themed):
         self.addItems(items)
         self.setCurrentIndex(index)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._open = Tween(self, self.update, 0.0, 200)
+        self._hover = Tween(self, self.update, 0.0, 140)
         self._bind_theme()
+
+    def showPopup(self) -> None:  # noqa: N802
+        self._open.to(1.0)
+        super().showPopup()
+
+    def hidePopup(self) -> None:  # noqa: N802
+        self._open.to(0.0)
+        super().hidePopup()
+
+    def enterEvent(self, e) -> None:  # noqa: N802
+        self._hover.to(1.0)
+        super().enterEvent(e)
+
+    def leaveEvent(self, e) -> None:  # noqa: N802
+        self._hover.to(0.0)
+        super().leaveEvent(e)
 
     def paintEvent(self, e) -> None:  # noqa: N802
         super().paintEvent(e)
         p = QPainter(self)
-        pm = icons.pixmap("chevron-down", current().text_muted, 16)
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        color = _lerp_color(qcolor(current().text_muted), qcolor(current().accent), self._open.value)
+        pm = icons.tinted("chevron-down", color, 16)
         x = 10 if self.isRightToLeft() else self.width() - 26
-        p.drawPixmap(x, (self.height() - 16) // 2, pm)
+        cx, cy = x + 8, self.height() / 2
+        p.translate(cx, cy)
+        p.rotate(180 * self._open.value)
+        p.drawPixmap(QPointF(-8, -8), pm)
 
 
 # --------------------------------------------------------------------------- stats
@@ -540,7 +556,7 @@ class AnimatedNumber(QLabel):
 
 class StatCard(Card, _Themed):
     def __init__(self, icon_name: str, title: str, value: int = 0, parent: QWidget | None = None):
-        super().__init__(parent)
+        super().__init__(parent, hoverable=True)
         self._icon_name = icon_name
         self.icon = QLabel()
         self.number = AnimatedNumber(value)
@@ -567,40 +583,63 @@ class StatCard(Card, _Themed):
 
 
 class BarChart(QWidget, _Themed):
-    """Minimal 7-bar chart; the last bar (today) uses the accent colour."""
+    """Minimal 7-bar chart; bars grow in with a stagger, today uses the accent colour."""
 
     def __init__(self, labels: list[str] | None = None, parent: QWidget | None = None):
         super().__init__(parent)
         self.values: list[int] = []
+        self._from: list[float] = []
+        self._shown: list[float] = []
         self.labels = labels or []
         self.setMinimumHeight(150)
+        self._t = Tween(self, self._advance, 1.0, 700, QEasingCurve.Type.Linear)
         self._bind_theme()
 
     def set_data(self, values: list[int], labels: list[str] | None = None) -> None:
-        self.values = list(values)
         if labels is not None:
             self.labels = labels
+        if list(values) != self.values:
+            self._from = list(self._shown) if len(self._shown) == len(values) else [0.0] * len(values)
+            self.values = list(values)
+            self._t.jump(0.0)
+            self._t.to(1.0)
+        self.update()
+
+    def _advance(self) -> None:
+        n = len(self.values)
+        out = []
+        for i, v in enumerate(self.values):
+            start = (i / max(1, n)) * 0.45
+            local = max(0.0, min(1.0, (self._t.value - start) / 0.55))
+            eased = 1 - (1 - local) ** 3
+            base = self._from[i] if i < len(self._from) else 0.0
+            out.append(base + (v - base) * eased)
+        self._shown = out
         self.update()
 
     def paintEvent(self, _e) -> None:  # noqa: N802
         if not self.values:
             return
+        shown = self._shown if len(self._shown) == len(self.values) else [float(v) for v in self.values]
         p, pal = QPainter(self), current()
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        n, top = len(self.values), max(1, max(self.values))
+        n, top = len(self.values), max(1.0, max(max(shown), float(max(self.values))))
         label_h, w, h = 22, self.width(), self.height()
         slot = w / n
         bar_w = min(30.0, slot * 0.46)
-        for i, v in enumerate(self.values):
-            bh = max(6.0, (h - label_h - 8) * v / top) if v else 6.0
+        for i, v in enumerate(shown):
+            bh = 6.0 + (h - label_h - 14) * v / top
             x = i * slot + (slot - bar_w) / 2
             rect = QRectF(x, h - label_h - bh, bar_w, bh)
             is_today = i == n - 1
-            color = qcolor(pal.accent) if is_today and v else qcolor(
-                pal.surface_hover if pal.name == "dark" else "#E4E0D6")
-            if v and not is_today:
+            has = self.values[i] > 0
+            if is_today and has:
+                color = qcolor(pal.accent)
+            elif has:
                 color = qcolor(pal.accent_soft)
                 color.setAlpha(120 if pal.name == "dark" else 160)
+            else:
+                color = qcolor(pal.surface_hover if pal.name == "dark" else "#E4E0D6")
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(color)
             p.drawRoundedRect(rect, 6, 6)
