@@ -11,3 +11,4 @@ def test_import_and_noop_behaviour_off_windows():
     assert winapi.is_autostart_enabled() is False
     assert winapi.system_uses_light_theme() is False
     assert winapi.set_system_light_theme(True) is False
+    assert winapi.create_single_instance_mutex() is False

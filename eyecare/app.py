@@ -189,6 +189,7 @@ def run(argv: list[str] | None = None) -> int:
     if not lock.tryLock(100):
         return 0  # already running
 
+    winapi.create_single_instance_mutex()
     fonts.load_fonts()
     app = EyeCareApp(qt)
     app.start(background=background)
