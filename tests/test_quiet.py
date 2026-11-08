@@ -95,12 +95,11 @@ def test_home_shows_quiet_state_and_button(engine):
 
 def test_tray_quiet_menu(engine):
     t = Tray(engine)
-    assert len(t.quiet_actions) == 5 and not t.quiet_end_action.isVisible() or True
+    assert len(t.quiet_actions) == 5
+    assert t.quiet_end_action.isVisible() is False
     t.meeting_action.trigger()
-    assert engine.quiet_active
-    t.retranslate()
-    assert t.quiet_end_action.isVisibleTo(t.menu) or t.quiet_end_action.isVisible()
+    assert engine.quiet_active and t.quiet_end_action.isVisible() is True
     t.quiet_end_action.trigger()
-    assert not engine.quiet_active
+    assert not engine.quiet_active and t.quiet_end_action.isVisible() is False
     t.quiet_actions[4][0].trigger()
     assert engine.quiet_until == float("inf")
