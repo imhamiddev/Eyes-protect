@@ -38,6 +38,7 @@ class Engine(QObject):
     break_tick = Signal(int)             # seconds left
     break_finished = Signal(bool)        # True = completed, False = skipped
     blink_requested = Signal()
+    posture_requested = Signal()
     water_requested = Signal()
     natural_break = Signal()
     state_changed = Signal()             # anything the UI may want to redraw
@@ -57,6 +58,7 @@ class Engine(QObject):
         self.rule = rule_mod.Rule202020(s.rule202020)
         self.blink = IntervalReminder(s.blink.interval_min, s.blink.enabled)
         self.water = IntervalReminder(s.hydration.interval_min, s.hydration.enabled)
+        self.posture = IntervalReminder(s.posture.interval_min, s.posture.enabled)
         self.display_state = DisplayState()
         self._shown: DisplayState | None = None
         self.monitors = winapi.list_monitors()
@@ -101,6 +103,7 @@ class Engine(QObject):
         self.rule.reload(s.rule202020)
         self.blink.configure(s.blink.interval_min, s.blink.enabled)
         self.water.configure(s.hydration.interval_min, s.hydration.enabled)
+        self.posture.configure(s.posture.interval_min, s.posture.enabled)
         save_settings(s, self._settings_path)
         self.refresh_monitors()
         self.apply_display(force=True)
@@ -260,6 +263,8 @@ class Engine(QObject):
             self.blink_requested.emit()
         if self.water.tick(1.0, idle, silent):
             self.water_requested.emit()
+        if self.posture.tick(1.0, idle, silent):
+            self.posture_requested.emit()
         self.state_changed.emit()
 
     def _track_activity(self, idle: float) -> None:
@@ -306,6 +311,9 @@ class Engine(QObject):
 
     def record_blink_shown(self) -> None:
         self.stats.add("blinks")
+
+    def record_stretch(self) -> None:
+        self.stats.add("stretches")
 
     def record_water(self) -> None:
         self.stats.add("water")

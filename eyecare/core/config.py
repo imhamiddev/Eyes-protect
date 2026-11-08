@@ -51,6 +51,12 @@ class Hydration:
 
 
 @dataclass
+class Posture:
+    enabled: bool = True
+    interval_min: int = 45
+
+
+@dataclass
 class NightLight:
     enabled: bool = False
     strength: int = 40  # 0..100 warmth
@@ -113,6 +119,7 @@ class Settings:
     rule202020: Rule202020 = field(default_factory=Rule202020)
     blink: Blink = field(default_factory=Blink)
     hydration: Hydration = field(default_factory=Hydration)
+    posture: Posture = field(default_factory=Posture)
     night_light: NightLight = field(default_factory=NightLight)
     dimmer: Dimmer = field(default_factory=Dimmer)
     auto_dark: AutoDarkMode = field(default_factory=AutoDarkMode)

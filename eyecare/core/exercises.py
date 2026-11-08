@@ -18,6 +18,7 @@ class Exercise:
     title_en: str
     title_fa: str
     steps: tuple[Step, ...]
+    kind: str = "eyes"   # eyes | body
 
     @property
     def total_seconds(self) -> int:
@@ -53,8 +54,48 @@ EXERCISES: tuple[Exercise, ...] = (
 )
 
 
+STRETCHES: tuple[Exercise, ...] = (
+    Exercise("neck", "person", "Neck release", "رها کردن گردن", (
+        Step(10, "Drop your right ear toward your right shoulder. Breathe slowly.",
+             "گوش راست را به سمت شانه‌ی راست پایین بیاورید و آرام نفس بکشید."),
+        Step(10, "Switch sides: left ear toward your left shoulder.",
+             "طرف دیگر: گوش چپ به سمت شانه‌ی چپ."),
+        Step(10, "Gently lower your chin to your chest and hold.",
+             "چانه را آرام به سمت سینه پایین بیاورید و نگه دارید."),
+    ), "body"),
+    Exercise("shoulders", "person", "Shoulder rolls", "چرخش شانه‌ها", (
+        Step(10, "Lift both shoulders up toward your ears, then release.",
+             "هر دو شانه را به سمت گوش‌ها بالا ببرید و رها کنید."),
+        Step(10, "Roll your shoulders backward in big slow circles.",
+             "شانه‌ها را در دایره‌های بزرگ و آهسته به عقب بچرخانید."),
+        Step(10, "Now roll them forward.", "حالا به جلو بچرخانید."),
+    ), "body"),
+    Exercise("wrists", "hand", "Wrist and finger stretch", "کشش مچ و انگشتان", (
+        Step(12, "Extend your right arm, palm up, and gently pull the fingers down with your left hand.",
+             "دست راست را با کف رو به بالا دراز کنید و انگشتان را با دست چپ آرام پایین بکشید."),
+        Step(12, "Turn the palm down and gently press the back of the hand.",
+             "کف دست را رو به پایین بچرخانید و پشت دست را آرام فشار دهید."),
+        Step(12, "Switch hands and repeat.", "دست‌ها را عوض کنید و تکرار کنید."),
+    ), "body"),
+    Exercise("back", "person", "Seated back twist", "پیچش کمر در حالت نشسته", (
+        Step(12, "Sit tall, place your right hand on your left knee and twist gently to the left.",
+             "صاف بنشینید، دست راست را روی زانوی چپ بگذارید و آرام به چپ بچرخید."),
+        Step(12, "Return to the center, then twist to the right.",
+             "به وسط برگردید و بعد به راست بچرخید."),
+    ), "body"),
+    Exercise("stand", "person", "Stand up and walk", "بلند شوید و راه بروید", (
+        Step(10, "Stand up and take a deep breath, arms overhead.",
+             "بلند شوید و با دست‌های بالای سر یک نفس عمیق بکشید."),
+        Step(30, "Walk around, get some water or look out of a window.",
+             "کمی راه بروید، آب بنوشید یا از پنجره بیرون را نگاه کنید."),
+    ), "body"),
+)
+
+ALL_EXERCISES: tuple[Exercise, ...] = EXERCISES + STRETCHES
+
+
 def by_id(exercise_id: str) -> Exercise:
-    for e in EXERCISES:
+    for e in ALL_EXERCISES:
         if e.id == exercise_id:
             return e
     raise KeyError(exercise_id)

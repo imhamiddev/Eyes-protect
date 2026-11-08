@@ -1,11 +1,11 @@
 """Exercises: guided, auto-advancing eye exercises."""
 from __future__ import annotations
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from eyecare.core import i18n
-from eyecare.core.exercises import EXERCISES, Exercise
+from eyecare.core.exercises import EXERCISES, STRETCHES, Exercise
 from eyecare.core.i18n import tr
 from eyecare.core.timeutil import format_mmss
 
@@ -26,9 +26,14 @@ def _step_text(step) -> str:
 class ExerciseRunner(QDialog):
     """Modal guided session; steps advance on their own."""
 
-    def __init__(self, exercise: Exercise, parent: QWidget | None = None):
+    completed = Signal()
+
+    def __init__(self, exercise: Exercise, parent: QWidget | None = None, engine=None):
         super().__init__(parent)
         self.exercise = exercise
+        self.engine = engine
+        if parent is None:
+            self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.setObjectName("Root")
         self.setModal(True)
         self.setWindowTitle(_title(exercise))
@@ -84,6 +89,9 @@ class ExerciseRunner(QDialog):
             if self.step_index + 1 >= len(self.exercise.steps):
                 self.finished = True
                 self.timer.stop()
+                if self.engine is not None and self.exercise.kind == "body":
+                    self.engine.record_stretch()
+                self.completed.emit()
                 self.text.setText(tr("ex.done"))
                 self.ring.set_progress(1.0)
                 self.ring.set_text("✓")
@@ -99,7 +107,11 @@ class ExercisesPage(Page):
     def __init__(self, engine):
         super().__init__(engine, "ex.title", tr("ex.subtitle"))
         self.runner: ExerciseRunner | None = None
+        self.section(tr("ex.eyes"))
         for exercise in EXERCISES:
+            self._add_row(exercise)
+        self.section(tr("ex.body"))
+        for exercise in STRETCHES:
             self._add_row(exercise)
         self.finish()
 
@@ -125,6 +137,6 @@ class ExercisesPage(Page):
         self.col.addWidget(card)
 
     def run(self, exercise: Exercise) -> ExerciseRunner:
-        self.runner = ExerciseRunner(exercise, self.window())
+        self.runner = ExerciseRunner(exercise, self.window(), self.engine)
         self.runner.show()
         return self.runner

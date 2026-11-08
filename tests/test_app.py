@@ -108,3 +108,22 @@ def test_update_ready_shows_toast_and_install_quits(ea):
     ea.engine.updates.quit_requested.connect(lambda: quits.append(1))
     ea.engine.updates.quit_requested.emit()  # the real quit() runs too (shuts the engine down)
     assert quits == [1] and ea.window.quitting is True
+
+
+def test_posture_toast_and_stretch_runner(ea):
+    ea.on_posture()
+    assert ea.toasts.count() == 1
+    runner = ea.start_stretch()
+    assert runner.exercise.kind == "body"
+    runner.timer.stop()
+    runner.close()
+
+
+def test_engine_emits_posture_reminder(ea):
+    seen = []
+    ea.engine.posture_requested.connect(lambda: seen.append(1))
+    ea.engine.settings.posture.interval_min = 1
+    ea.engine.commit_settings()
+    for _ in range(60):
+        ea.engine.on_tick()
+    assert seen == [1]

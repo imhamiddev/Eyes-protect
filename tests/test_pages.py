@@ -285,3 +285,40 @@ def test_stats_page_empty_state(engine):
     p = StatsPage(engine)
     assert "No data" in p.r_totals.text() and p.r_best.isHidden()
     p.grab()
+
+
+def test_care_posture_settings(engine):
+    p = CarePage(engine)
+    assert engine.settings.posture.enabled and p.posture_int.value() == 45
+    p.posture_int.set_value(60)
+    p.posture_on.setChecked(False)
+    assert engine.settings.posture.interval_min == 60 and engine.settings.posture.enabled is False
+    assert engine.posture.enabled is False and engine.posture.interval_min == 60
+
+
+def test_completed_stretch_is_counted_but_eye_exercise_is_not(engine):
+    from eyecare.core.exercises import STRETCHES
+
+    done = []
+    r = ExerciseRunner(STRETCHES[0], None, engine)
+    r.completed.connect(lambda: done.append(1))
+    r.timer.stop()
+    for _ in range(STRETCHES[0].total_seconds):
+        r.tick()
+    assert done == [1] and engine.stats.get("stretches") == 1
+    r.close()
+    r2 = ExerciseRunner(EXERCISES[0], None, engine)
+    r2.timer.stop()
+    for _ in range(EXERCISES[0].total_seconds):
+        r2.tick()
+    assert engine.stats.get("stretches") == 1
+    r2.close()
+
+
+def test_exercises_page_has_eye_and_body_sections(engine):
+    from eyecare.core.exercises import ALL_EXERCISES
+    from eyecare.ui.widgets import AnimatedButton
+
+    p = ExercisesPage(engine)
+    starts = [b for b in p.findChildren(AnimatedButton) if b.text() == i18n.tr("ex.start")]
+    assert len(starts) == len(ALL_EXERCISES)
