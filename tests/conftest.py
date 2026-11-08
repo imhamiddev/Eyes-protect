@@ -36,6 +36,8 @@ def _hermetic_winapi(monkeypatch):
     monkeypatch.setattr(winapi, "idle_seconds", lambda: 0.0)
     monkeypatch.setattr(winapi, "set_gamma_ramp", lambda ramp: False)
     monkeypatch.setattr(winapi, "reset_gamma", lambda: False)
+    monkeypatch.setattr(winapi, "set_monitor_gamma_ramp", lambda device, ramp: False)
+    monkeypatch.setattr(winapi, "list_monitors", lambda: [winapi.Monitor("DISPLAY1", 1920, 1080, True)])
     monkeypatch.setattr(winapi, "set_autostart", lambda *a, **k: False)
     monkeypatch.setattr(winapi, "set_system_light_theme", lambda light: False)
     monkeypatch.setattr(winapi, "system_uses_light_theme", lambda: False)
