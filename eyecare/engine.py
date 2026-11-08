@@ -1,6 +1,7 @@
 """Qt-facing controller: owns settings, timers and all side effects."""
 from __future__ import annotations
 
+import os
 import sys
 import time
 from pathlib import Path
@@ -15,6 +16,7 @@ from eyecare.core.timeutil import now_time
 from eyecare.features import rule202020 as rule_mod
 from eyecare.features.display import DisplayState, compute_display_state, wants_light_theme
 from eyecare.features.interval import IntervalReminder
+from eyecare.features.smartpause import Debouncer, classify
 from eyecare.updates import UpdateManager
 
 DISPLAY_REAPPLY_SECONDS = 60
@@ -57,6 +59,8 @@ class Engine(QObject):
         self._since_apply = DISPLAY_REAPPLY_SECONDS
         self._last_theme_target: bool | None = None
         self.updates = UpdateManager(self)
+        self._smart = Debouncer(2)
+        self._poll_count = 0
         self._timer = QTimer(self)
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self.on_tick)
@@ -89,6 +93,9 @@ class Engine(QObject):
         self.apply_display(force=True)
         self.sync_autostart()
         self._last_theme_target = None
+        if not self.settings.smart_pause.enabled:
+            self._smart.update(None)
+            self.set_busy(None)
         self.settings_changed.emit()
         self.state_changed.emit()
 
@@ -124,6 +131,13 @@ class Engine(QObject):
             self._last_theme_target = want_light
             if winapi.system_uses_light_theme() != want_light:
                 winapi.set_system_light_theme(want_light)
+
+    # -- smart pause --------------------------------------------------------
+    def poll_smart_pause(self) -> None:
+        cfg = self.settings.smart_pause
+        observed = classify(cfg, winapi.notification_state(), winapi.foreground_info(), os.getpid()) \
+            if cfg.enabled else None
+        self.set_busy(self._smart.update(observed))
 
     # -- quiet mode / holding ---------------------------------------------
     @property
@@ -166,6 +180,9 @@ class Engine(QObject):
     def on_tick(self) -> None:
         idle = winapi.idle_seconds()
         self._since_apply += 1
+        self._poll_count += 1
+        if self._poll_count % 2 == 0:
+            self.poll_smart_pause()
         self.apply_display()
         self._apply_auto_theme()
         if self.quiet_until and not self.quiet_active:

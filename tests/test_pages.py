@@ -181,3 +181,13 @@ def test_auto_update_toggle_persists(engine):
     p = SettingsPage(engine)
     p.auto_update.setChecked(False)
     assert engine.settings.general.auto_update is False
+
+
+def test_care_smart_pause_switches(engine):
+    p = CarePage(engine)
+    assert engine.settings.smart_pause.enabled and p.smart_full.isEnabled()
+    p.smart_on.setChecked(False)
+    assert engine.settings.smart_pause.enabled is False and not p.smart_full.isEnabled()
+    p.smart_on.setChecked(True)
+    p.smart_meet.setChecked(False)
+    assert engine.settings.smart_pause.meetings is False

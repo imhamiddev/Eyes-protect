@@ -35,6 +35,18 @@ class CarePage(Page):
             SettingRow(tr("care.skippable"), "", self.skippable),
         )
 
+        self.section(tr("care.smart"))
+        self.smart_on = Toggle()
+        self.smart_full = Toggle()
+        self.smart_meet = Toggle()
+        self.smart_focus = Toggle()
+        self.card(
+            SettingRow(tr("care.smart"), tr("care.smart_desc"), self.smart_on),
+            SettingRow(tr("care.smart_fullscreen"), "", self.smart_full),
+            SettingRow(tr("care.smart_meetings"), "", self.smart_meet),
+            SettingRow(tr("care.smart_focus"), "", self.smart_focus),
+        )
+
         self.section(tr("care.blink"))
         self.blink_on = Toggle()
         self.blink_int = Stepper(1, 60, s.blink.interval_min)
@@ -54,7 +66,8 @@ class CarePage(Page):
         )
         self.finish()
 
-        for toggle in (self.rule_on, self.natural, self.lock, self.skippable, self.blink_on, self.water_on):
+        for toggle in (self.rule_on, self.natural, self.lock, self.skippable, self.blink_on, self.water_on,
+                       self.smart_on, self.smart_full, self.smart_meet, self.smart_focus):
             toggle.toggled.connect(self._save)
         for stepper in (self.interval, self.length, self.snooze, self.blink_int, self.water_int):
             stepper.valueChanged.connect(self._save)
@@ -71,6 +84,13 @@ class CarePage(Page):
         self.natural.setChecked(s.rule202020.detect_natural_breaks)
         self.lock.setChecked(s.rule202020.use_break_lock)
         self.skippable.setChecked(s.break_lock.skippable)
+        sp = s.smart_pause
+        self.smart_on.setChecked(sp.enabled)
+        self.smart_full.setChecked(sp.fullscreen)
+        self.smart_meet.setChecked(sp.meetings)
+        self.smart_focus.setChecked(sp.focus_assist)
+        for t in (self.smart_full, self.smart_meet, self.smart_focus):
+            t.setEnabled(sp.enabled)
         self.blink_on.setChecked(s.blink.enabled)
         self.blink_int.set_value(s.blink.interval_min, emit=False)
         self.water_on.setChecked(s.hydration.enabled)
@@ -88,6 +108,11 @@ class CarePage(Page):
         s.rule202020.detect_natural_breaks = self.natural.isChecked()
         s.rule202020.use_break_lock = self.lock.isChecked()
         s.break_lock.skippable = self.skippable.isChecked()
+        sp = s.smart_pause
+        sp.enabled, sp.fullscreen = self.smart_on.isChecked(), self.smart_full.isChecked()
+        sp.meetings, sp.focus_assist = self.smart_meet.isChecked(), self.smart_focus.isChecked()
+        for t in (self.smart_full, self.smart_meet, self.smart_focus):
+            t.setEnabled(sp.enabled)
         s.blink.enabled = self.blink_on.isChecked()
         s.blink.interval_min = self.blink_int.value()
         s.hydration.enabled = self.water_on.isChecked()
