@@ -102,3 +102,74 @@ def test_manual_toggle_is_instant_without_animations(app, tmp_path):
         assert e._tween.state() != e._tween.State.Running and e._shown.kelvin == 1900
     finally:
         motion.set_enabled(True)
+
+
+def _two_monitors(monkeypatch):
+    from eyecare.core import winapi
+
+    mons = [winapi.Monitor("\\\\.\\DISPLAY1", 1920, 1080, True),
+            winapi.Monitor("\\\\.\\DISPLAY2", 2560, 1440, False)]
+    calls = {}
+    monkeypatch.setattr(winapi, "list_monitors", lambda: mons)
+    monkeypatch.setattr(winapi, "set_monitor_gamma_ramp",
+                        lambda device, ramp: calls.__setitem__(device, ramp) or True)
+    return mons, calls
+
+
+def test_filters_apply_to_every_monitor_by_default(app, tmp_path, monkeypatch):
+    from eyecare.core import winapi
+    from eyecare.ui import motion
+
+    motion.set_enabled(False)
+    _mons, calls = _two_monitors(monkeypatch)
+    e = make(tmp_path)
+    e.settings.night_light.enabled, e.settings.night_light.strength = True, 100
+    e.settings.night_light.schedule = False
+    e.commit_settings()
+    assert set(calls) == {"\\\\.\\DISPLAY1", "\\\\.\\DISPLAY2"}
+    for ramp in calls.values():
+        assert ramp[2][255] < ramp[0][255]  # blue reduced -> warm
+    motion.set_enabled(True)
+
+
+def test_excluded_monitor_stays_neutral_and_brightness_is_per_monitor(app, tmp_path, monkeypatch):
+    from eyecare.core import winapi
+    from eyecare.ui import motion
+
+    motion.set_enabled(False)
+    _mons, calls = _two_monitors(monkeypatch)
+    e = make(tmp_path)
+    nl = e.settings.night_light
+    nl.enabled, nl.strength, nl.schedule = True, 100, False
+    e.settings.monitors.excluded = "DISPLAY2"
+    e.settings.monitors.brightness = "DISPLAY1=50"
+    e.commit_settings()
+    assert calls["\\\\.\\DISPLAY2"] == winapi.IDENTITY_RAMP
+    warm, identity = calls["\\\\.\\DISPLAY1"], winapi.IDENTITY_RAMP
+    assert warm[0][255] < identity[0][255]  # dimmed to ~50% -> clamped to 30%+ range
+    motion.set_enabled(True)
+
+
+def test_neutral_monitor_factor_dims_even_without_filters(app, tmp_path, monkeypatch):
+    from eyecare.core import winapi
+    from eyecare.ui import motion
+
+    motion.set_enabled(False)
+    _mons, calls = _two_monitors(monkeypatch)
+    e = make(tmp_path)
+    e.settings.monitors.brightness = "DISPLAY2=60"
+    e.commit_settings()
+    assert calls["\\\\.\\DISPLAY1"] == winapi.IDENTITY_RAMP
+    assert calls["\\\\.\\DISPLAY2"][0][255] < 65535
+    motion.set_enabled(True)
+
+
+def test_monitor_hotplug_is_detected(app, tmp_path, monkeypatch):
+    from eyecare.core import winapi
+
+    mons, calls = _two_monitors(monkeypatch)
+    e = make(tmp_path)
+    assert len(e.monitors) == 2
+    monkeypatch.setattr(winapi, "list_monitors", lambda: mons[:1])
+    assert e.refresh_monitors() is True and len(e.monitors) == 1
+    assert e.refresh_monitors() is False

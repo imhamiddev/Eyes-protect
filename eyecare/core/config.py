@@ -96,6 +96,12 @@ class SmartPause:
 
 
 @dataclass
+class Monitors:
+    excluded: str = ""       # comma-separated monitor keys the filters should NOT touch
+    brightness: str = ""     # 'DISPLAY1=80;DISPLAY2=100' per-monitor brightness multiplier (%)
+
+
+@dataclass
 class Location:
     city: str = "tehran"
 
@@ -112,6 +118,7 @@ class Settings:
     break_lock: BreakLock = field(default_factory=BreakLock)
     smart_pause: SmartPause = field(default_factory=SmartPause)
     location: Location = field(default_factory=Location)
+    monitors: Monitors = field(default_factory=Monitors)
 
 
 def _merge(target: Any, data: dict) -> None:

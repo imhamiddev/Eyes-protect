@@ -12,6 +12,7 @@ from eyecare.core import winapi
 from eyecare.core.colortemp import build_ramp, channel_multipliers
 from eyecare.core.config import Settings, load_settings, save_settings
 from eyecare.core.stats import Stats
+from eyecare.core import monitors as mon
 from eyecare.core.cities import city_by_key
 from eyecare.core.timeutil import now_precise, now_time
 from eyecare.features import rule202020 as rule_mod
@@ -58,6 +59,7 @@ class Engine(QObject):
         self.water = IntervalReminder(s.hydration.interval_min, s.hydration.enabled)
         self.display_state = DisplayState()
         self._shown: DisplayState | None = None
+        self.monitors = winapi.list_monitors()
         self._from = self._to = DisplayState()
         self._tween = QVariantAnimation(self)
         self._tween.setStartValue(0.0)
@@ -99,6 +101,7 @@ class Engine(QObject):
         self.blink.configure(s.blink.interval_min, s.blink.enabled)
         self.water.configure(s.hydration.interval_min, s.hydration.enabled)
         save_settings(s, self._settings_path)
+        self.refresh_monitors()
         self.apply_display(force=True)
         self.sync_autostart()
         self._last_theme_target = None
@@ -117,11 +120,25 @@ class Engine(QObject):
         return compute_display_state(self.settings.night_light, self.settings.dimmer,
                                      now_precise(), city)
 
+    def refresh_monitors(self) -> bool:
+        """Re-read the attached displays; True if the set changed."""
+        current = winapi.list_monitors()
+        changed = current != self.monitors
+        self.monitors = current
+        return changed
+
     def _apply_gamma(self, state: DisplayState) -> None:
-        if state.is_neutral:
-            winapi.reset_gamma()
-        else:
-            winapi.set_gamma_ramp(build_ramp(channel_multipliers(state.kelvin, state.brightness)))
+        excluded = mon.parse_set(self.settings.monitors.excluded)
+        factors = mon.parse_map(self.settings.monitors.brightness)
+        for m in self.monitors:
+            k = mon.key(m.device)
+            f = factors.get(k, 100) / 100
+            if k in excluded or (state.is_neutral and f >= 1.0):
+                ramp = winapi.IDENTITY_RAMP
+            else:
+                ramp = build_ramp(channel_multipliers(state.kelvin, state.brightness * f))
+            if not winapi.set_monitor_gamma_ramp(m.device, ramp) and m.primary:
+                winapi.set_gamma_ramp(ramp)  # fallback for drivers that reject per-device DCs
 
     def _push(self, state: DisplayState) -> None:
         """Send ``state`` to the screen now."""
@@ -225,6 +242,9 @@ class Engine(QObject):
         self._poll_count += 1
         if self._poll_count % 2 == 0:
             self.poll_smart_pause()
+        if self._poll_count % 15 == 0 and self.refresh_monitors():
+            self.apply_display(force=True)
+            self.state_changed.emit()
         self.apply_display()
         self._apply_auto_theme()
         if self.quiet_until and not self.quiet_active:

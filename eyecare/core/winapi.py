@@ -6,6 +6,7 @@ rest of the code (and the test-suite) can import this module anywhere.
 from __future__ import annotations
 
 import sys
+from dataclasses import dataclass
 
 IS_WINDOWS = sys.platform == "win32"
 _RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -19,6 +20,20 @@ if IS_WINDOWS:
     _user32 = ctypes.WinDLL("user32", use_last_error=True)
     _gdi32 = ctypes.WinDLL("gdi32", use_last_error=True)
     _kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+
+    class _MONITORINFOEXW(ctypes.Structure):
+        _fields_ = [("cbSize", wintypes.DWORD), ("rcMonitor", wintypes.RECT),
+                    ("rcWork", wintypes.RECT), ("dwFlags", wintypes.DWORD),
+                    ("szDevice", ctypes.c_wchar * 32)]
+
+    _MONITORENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_int, wintypes.HANDLE, wintypes.HDC,
+                                          ctypes.POINTER(wintypes.RECT), wintypes.LPARAM)
+    _user32.EnumDisplayMonitors.argtypes = [wintypes.HDC, ctypes.c_void_p, _MONITORENUMPROC,
+                                            wintypes.LPARAM]
+    _user32.GetMonitorInfoW.argtypes = [wintypes.HANDLE, ctypes.POINTER(_MONITORINFOEXW)]
+    _gdi32.CreateDCW.restype = wintypes.HDC
+    _gdi32.CreateDCW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR, ctypes.c_void_p]
+    _gdi32.DeleteDC.argtypes = [wintypes.HDC]
 
     class _LASTINPUTINFO(ctypes.Structure):
         _fields_ = [("cbSize", wintypes.UINT), ("dwTime", wintypes.DWORD)]
@@ -67,9 +82,60 @@ def set_gamma_ramp(ramp: list[list[int]]) -> bool:
         _user32.ReleaseDC(None, hdc)
 
 
+IDENTITY_RAMP = [[min(65535, i * 257) for i in range(256)] for _ in range(3)]
+
+
 def reset_gamma() -> bool:
-    identity = [[min(65535, i * 257) for i in range(256)] for _ in range(3)]
-    return set_gamma_ramp(identity)
+    ok = set_gamma_ramp(IDENTITY_RAMP)
+    for mon in list_monitors():
+        ok = set_monitor_gamma_ramp(mon.device, IDENTITY_RAMP) and ok
+    return ok
+
+
+@dataclass(frozen=True)
+class Monitor:
+    device: str       # e.g. \\.\DISPLAY1
+    width: int
+    height: int
+    primary: bool
+
+
+def list_monitors() -> list[Monitor]:
+    """All attached displays (a single placeholder off Windows, for the UI and tests)."""
+    if not IS_WINDOWS:
+        return [Monitor("DISPLAY1", 1920, 1080, True)]
+    found: list[Monitor] = []
+
+    def callback(hmon, _hdc, _rect, _data):
+        info = _MONITORINFOEXW()
+        info.cbSize = ctypes.sizeof(_MONITORINFOEXW)
+        if _user32.GetMonitorInfoW(hmon, ctypes.byref(info)):
+            r = info.rcMonitor
+            found.append(Monitor(info.szDevice, r.right - r.left, r.bottom - r.top,
+                                 bool(info.dwFlags & 1)))
+        return 1
+
+    cb = _MONITORENUMPROC(callback)
+    _user32.EnumDisplayMonitors(None, None, cb, 0)
+    found.sort(key=lambda m: (not m.primary, m.device))
+    return found
+
+
+def set_monitor_gamma_ramp(device: str, ramp: list[list[int]]) -> bool:
+    """Apply a gamma ramp to one specific display."""
+    if not IS_WINDOWS:
+        return False
+    array = ((ctypes.c_ushort * 256) * 3)()
+    for c in range(3):
+        for i in range(256):
+            array[c][i] = ramp[c][i]
+    hdc = _gdi32.CreateDCW("DISPLAY", device, None, None)
+    if not hdc:
+        return False
+    try:
+        return bool(_gdi32.SetDeviceGammaRamp(hdc, ctypes.byref(array)))
+    finally:
+        _gdi32.DeleteDC(hdc)
 
 
 def set_autostart(enabled: bool, command: str, name: str = "EyeCare") -> bool:
