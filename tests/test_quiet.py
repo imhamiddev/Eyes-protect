@@ -61,15 +61,17 @@ def test_quiet_forever_and_toggle(engine):
     assert engine.toggle_quiet(30) is True
 
 
-def test_busy_reason_holds_like_quiet(engine):
+def test_busy_reason_holds_like_quiet(engine, monkeypatch):
+    from eyecare.core import winapi
+
     seen = []
     engine.prompt_requested.connect(lambda: seen.append(1))
-    engine.set_busy("fullscreen")
+    monkeypatch.setattr(winapi, "notification_state", lambda: 2)  # a full-screen app is running
     ticks(engine, 120)
-    assert seen == [] and engine.holding
-    engine.set_busy(None)
+    assert seen == [] and engine.holding and engine.busy_reason == "fullscreen"
+    monkeypatch.setattr(winapi, "notification_state", lambda: 5)  # back to normal
     ticks(engine, 60)
-    assert seen == [1]
+    assert seen == [1] and engine.busy_reason is None
 
 
 def test_quiet_does_not_stop_a_manual_break(engine):
