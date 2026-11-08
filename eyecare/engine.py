@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QObject, QTimer, Signal
@@ -45,6 +46,8 @@ class Engine(QObject):
         self.settings = settings or load_settings(settings_path)
         self.stats = stats or Stats()
         self.paused = False
+        self.quiet_until = 0.0           # epoch seconds; inf = until switched off
+        self.busy_reason: str | None = None   # set by smart pause (e.g. 'fullscreen')
         s = self.settings
         self.rule = rule_mod.Rule202020(s.rule202020)
         self.blink = IntervalReminder(s.blink.interval_min, s.blink.enabled)
@@ -122,6 +125,38 @@ class Engine(QObject):
             if winapi.system_uses_light_theme() != want_light:
                 winapi.set_system_light_theme(want_light)
 
+    # -- quiet mode / holding ---------------------------------------------
+    @property
+    def quiet_active(self) -> bool:
+        return time.time() < self.quiet_until
+
+    @property
+    def holding(self) -> bool:
+        """True while reminders must stay silent (quiet mode or a busy full-screen/meeting app)."""
+        return self.quiet_active or self.busy_reason is not None
+
+    def set_quiet(self, minutes: float | None) -> None:
+        """Silence reminders for ``minutes`` (None = until switched off, <=0 = end quiet mode)."""
+        if minutes is None:
+            self.quiet_until = float("inf")
+        elif minutes <= 0:
+            self.quiet_until = 0.0
+        else:
+            self.quiet_until = time.time() + minutes * 60
+        self.state_changed.emit()
+
+    def toggle_quiet(self, minutes: float = 60) -> bool:
+        if self.quiet_active:
+            self.set_quiet(0)
+        else:
+            self.set_quiet(minutes)
+        return self.quiet_active
+
+    def set_busy(self, reason: str | None) -> None:
+        if reason != self.busy_reason:
+            self.busy_reason = reason
+            self.state_changed.emit()
+
     # -- reminders --------------------------------------------------------
     def set_paused(self, paused: bool) -> None:
         self.paused = paused
@@ -133,12 +168,16 @@ class Engine(QObject):
         self._since_apply += 1
         self.apply_display()
         self._apply_auto_theme()
-        self._handle(self.rule.tick(1.0, idle))
+        if self.quiet_until and not self.quiet_active:
+            self.quiet_until = 0.0  # quiet period ran out
+        hold = self.holding
+        self._handle(self.rule.tick(1.0, idle, hold))
         if self.rule.phase == rule_mod.Phase.BREAK and not self.paused:
             self.break_tick.emit(self.rule.break_seconds_left)
-        if self.blink.tick(1.0, idle, self.paused):
+        silent = self.paused or hold
+        if self.blink.tick(1.0, idle, silent):
             self.blink_requested.emit()
-        if self.water.tick(1.0, idle, self.paused):
+        if self.water.tick(1.0, idle, silent):
             self.water_requested.emit()
         self.state_changed.emit()
 

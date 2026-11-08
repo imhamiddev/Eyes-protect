@@ -1,7 +1,7 @@
 """Home: next-break ring, quick actions, today's stats and the weekly chart."""
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QGridLayout, QHBoxLayout, QVBoxLayout, QWidget
@@ -10,7 +10,7 @@ from eyecare.core import i18n
 from eyecare.core.timeutil import format_mmss
 from eyecare.features.rule202020 import Phase
 
-from ..widgets import BarChart, Card, Ring, StatCard, label, primary_button, secondary_button
+from ..widgets import BarChart, Card, Ring, StatCard, ghost_button, label, primary_button, secondary_button
 from .base import Page
 
 WEEKDAYS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
@@ -39,6 +39,9 @@ class HomePage(Page):
         buttons.addWidget(self.break_btn, 1)
         buttons.addWidget(self.pause_btn)
         hl.addLayout(buttons)
+        self.quiet_btn = ghost_button(i18n.tr("home.quiet_1h"))
+        self.quiet_btn.icon_name = "bell"
+        hl.addWidget(self.quiet_btn, 0, Qt.AlignmentFlag.AlignHCenter)
         row.addWidget(hero, 5)
 
         right = QVBoxLayout()
@@ -65,6 +68,7 @@ class HomePage(Page):
 
         self.break_btn.clicked.connect(self.engine.start_break)
         self.pause_btn.clicked.connect(lambda: self.engine.set_paused(not self.engine.paused))
+        self.quiet_btn.clicked.connect(lambda: self.engine.toggle_quiet(60))
         self.refresh()
 
     def refresh(self) -> None:
@@ -78,10 +82,19 @@ class HomePage(Page):
             self.ring.set_text(format_mmss(rule.seconds_to_break))
             if e.paused:
                 self.status.setText(i18n.tr("home.resume"))
+            elif e.quiet_active:
+                if e.quiet_until == float("inf"):
+                    self.status.setText(i18n.tr("home.quiet_on"))
+                else:
+                    until = datetime.fromtimestamp(e.quiet_until).strftime("%H:%M")
+                    self.status.setText(i18n.tr("home.quiet_until").replace("{t}", until))
+            elif e.busy_reason:
+                self.status.setText(i18n.tr("home.busy_" + e.busy_reason))
             elif not e.settings.rule202020.enabled:
                 self.status.setText(i18n.tr("home.rule_off"))
             else:
                 self.status.setText("20 · 20 · 20")
+        self.quiet_btn.setText(i18n.tr("home.quiet_end" if e.quiet_active else "home.quiet_1h"))
         paused = e.paused
         self.pause_btn.setText(i18n.tr("home.resume" if paused else "home.pause"))
         s = e.stats
