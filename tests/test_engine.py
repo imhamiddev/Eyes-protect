@@ -65,3 +65,40 @@ def test_commit_settings_persists(app, tmp_path):
     e.commit_settings()
     assert (tmp_path / "s.json").exists()
     assert e.water.interval_min == 33
+
+
+def test_manual_night_light_toggle_fades_smoothly(app, tmp_path, monkeypatch):
+    import time as _t
+
+    from eyecare.core import winapi
+    from eyecare.ui import motion
+
+    ramps = []
+    monkeypatch.setattr(winapi, "set_gamma_ramp", lambda r: ramps.append(r) or True)
+    motion.set_enabled(True)
+    e = make(tmp_path)
+    e.settings.night_light.strength = 100
+    e.apply_display(force=True)
+    start = len(ramps)
+    e.toggle_night_light()
+    assert e._tween.state() == e._tween.State.Running  # eased, not an instant jump
+    end = _t.time() + 3
+    while e._tween.state() == e._tween.State.Running and _t.time() < end:
+        app.processEvents()
+        _t.sleep(0.01)
+    assert e._shown.kelvin == 1900 and len(ramps) - start > 3
+    assert e.display_state.kelvin == 1900
+
+
+def test_manual_toggle_is_instant_without_animations(app, tmp_path):
+    from eyecare.ui import motion
+
+    motion.set_enabled(False)
+    try:
+        e = make(tmp_path)
+        e.settings.night_light.strength = 100
+        e.apply_display(force=True)
+        e.toggle_night_light()
+        assert e._tween.state() != e._tween.State.Running and e._shown.kelvin == 1900
+    finally:
+        motion.set_enabled(True)

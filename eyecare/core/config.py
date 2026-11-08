@@ -56,6 +56,8 @@ class NightLight:
     schedule: bool = True
     start: str = "20:00"
     end: str = "06:30"
+    sun: bool = False            # follow sunset/sunrise of the chosen city instead of fixed times
+    transition_min: int = 30     # gradual fade in/out at the edges of the schedule
 
 
 @dataclass
@@ -68,6 +70,7 @@ class Dimmer:
     schedule: bool = True
     night_start: str = "20:00"
     night_end: str = "06:30"
+    sun: bool = False
 
 
 @dataclass
@@ -93,6 +96,11 @@ class SmartPause:
 
 
 @dataclass
+class Location:
+    city: str = "tehran"
+
+
+@dataclass
 class Settings:
     general: General = field(default_factory=General)
     rule202020: Rule202020 = field(default_factory=Rule202020)
@@ -103,6 +111,7 @@ class Settings:
     auto_dark: AutoDarkMode = field(default_factory=AutoDarkMode)
     break_lock: BreakLock = field(default_factory=BreakLock)
     smart_pause: SmartPause = field(default_factory=SmartPause)
+    location: Location = field(default_factory=Location)
 
 
 def _merge(target: Any, data: dict) -> None:

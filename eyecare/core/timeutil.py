@@ -35,3 +35,12 @@ def now_time() -> time:
 def format_mmss(total_seconds: int) -> str:
     total_seconds = max(0, int(total_seconds))
     return f"{total_seconds // 60:02d}:{total_seconds % 60:02d}"
+
+
+def now_precise() -> time:
+    """Current local time including seconds (for smooth schedule fades)."""
+    return datetime.now().time().replace(microsecond=0)
+
+
+def minutes_precise(value: time) -> float:
+    return value.hour * 60 + value.minute + value.second / 60
