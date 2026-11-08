@@ -76,7 +76,12 @@ class HomePage(Page):
         else:
             self.ring.set_progress(rule.work_progress)
             self.ring.set_text(format_mmss(rule.seconds_to_break))
-            self.status.setText(i18n.tr("home.resume") if e.paused else "20 · 20 · 20")
+            if e.paused:
+                self.status.setText(i18n.tr("home.resume"))
+            elif not e.settings.rule202020.enabled:
+                self.status.setText(i18n.tr("home.rule_off"))
+            else:
+                self.status.setText("20 · 20 · 20")
         paused = e.paused
         self.pause_btn.setText(i18n.tr("home.resume" if paused else "home.pause"))
         s = e.stats

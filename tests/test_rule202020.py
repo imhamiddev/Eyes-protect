@@ -96,3 +96,52 @@ def test_reload_detects_change_on_shared_settings_object():
     live.interval_min = 3
     rule.reload(live)
     assert rule.seconds_to_break == 180
+
+
+def test_disabled_rule_never_prompts_or_locks_screen():
+    rule = make(enabled=False, use_break_lock=True)
+    assert run(rule, 300) == []
+    assert rule.phase == r.Phase.WORKING
+
+
+def test_disabling_cancels_a_pending_prompt():
+    rule = make()
+    run(rule, 60)
+    assert rule.phase == r.Phase.PROMPT
+    rule.reload(Cfg(interval_min=1, break_seconds=5, snooze_min=1, enabled=False))
+    assert rule.phase == r.Phase.WORKING and run(rule, 120) == []
+
+
+def test_reenabling_restarts_the_clock():
+    rule = make(enabled=False)
+    run(rule, 100)
+    rule.reload(Cfg(interval_min=1, break_seconds=5, snooze_min=1, enabled=True))
+    assert rule.seconds_to_break == 60
+    assert run(rule, 60) == [r.PROMPT]
+
+
+def test_manual_break_still_works_when_disabled():
+    rule = make(enabled=False)
+    assert rule.start_break() == [r.BREAK_START]
+    assert run(rule, 5) == [r.BREAK_DONE]
+
+
+def test_hold_freezes_clock_and_drops_prompt():
+    rule = make()
+    for _ in range(30):
+        rule.tick(1.0, 0.0, hold=True)
+    assert rule.seconds_to_break == 60
+    run(rule, 60)
+    assert rule.phase == r.Phase.PROMPT
+    assert rule.tick(1.0, 0.0, hold=True) == [r.SNOOZED]
+    assert rule.phase == r.Phase.WORKING
+
+
+def test_hold_does_not_interrupt_a_running_break():
+    rule = make(use_break_lock=True)
+    run(rule, 60)
+    assert rule.phase == r.Phase.BREAK
+    events = []
+    for _ in range(5):
+        events += rule.tick(1.0, 0.0, hold=True)
+    assert events == [r.BREAK_DONE]

@@ -39,7 +39,10 @@ class Rule202020:
     def reload(self, cfg: Rule202020Settings) -> None:
         old = self.cfg
         self.cfg = cfg = replace(cfg)
-        if cfg.interval_min != old.interval_min:
+        if old.enabled and not cfg.enabled and self.phase != Phase.WORKING:
+            self.phase = Phase.WORKING  # switching the rule off cancels any pending prompt/break
+            self.rest.stop()
+        if cfg.interval_min != old.interval_min or (cfg.enabled and not old.enabled):
             self.work.start(cfg.interval_min * 60)
             self.work.running = self.phase == Phase.WORKING
         if cfg.break_seconds != old.break_seconds:
@@ -82,14 +85,18 @@ class Rule202020:
         self.work.start(self.cfg.interval_min * 60)
 
     # -- time -------------------------------------------------------------
-    def tick(self, dt: float = 1.0, idle_seconds: float = 0.0) -> list[str]:
+    def tick(self, dt: float = 1.0, idle_seconds: float = 0.0, hold: bool = False) -> list[str]:
+        """Advance time. ``hold`` (quiet mode, full-screen app...) freezes the work clock
+        and swallows a pending prompt; a break that is already running continues."""
         if self.paused:
             return []
         if self.phase == Phase.WORKING:
+            if hold or not self.cfg.enabled:
+                return []
             return self._tick_working(dt, idle_seconds)
         if self.phase == Phase.PROMPT:
             self.prompt_left -= dt
-            if self.prompt_left <= 0:
+            if hold or self.prompt_left <= 0 or not self.cfg.enabled:
                 return self.snooze()
             return []
         if self.rest.tick(dt):
