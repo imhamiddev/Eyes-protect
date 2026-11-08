@@ -5,10 +5,10 @@ from PySide6.QtCore import (
     QEasingCurve, QPointF, QPropertyAnimation, QRectF, QSize, Qt, QVariantAnimation, Signal,
     Property,
 )
-from PySide6.QtGui import QColor, QFont, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QFont, QKeySequence, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
-    QAbstractButton, QComboBox, QFrame, QHBoxLayout, QLabel, QPushButton, QSlider, QToolButton,
-    QVBoxLayout, QWidget,
+    QAbstractButton, QComboBox, QFrame, QHBoxLayout, QKeySequenceEdit, QLabel, QPushButton, QSlider,
+    QToolButton, QVBoxLayout, QWidget,
 )
 
 from . import icons, tokens
@@ -650,6 +650,28 @@ class BarChart(QWidget, _Themed):
                 p.setFont(f)
                 p.drawText(QRectF(i * slot, h - label_h + 4, slot, label_h),
                            Qt.AlignmentFlag.AlignHCenter, self.labels[i])
+
+
+class ShortcutEdit(QKeySequenceEdit):
+    """Click, then press a key combination. Emits ``committed`` with the portable text."""
+
+    committed = Signal(str)
+
+    def __init__(self, combo: str = "", parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setLayoutDirection(Qt.LayoutDirection.LeftToRight)
+        self.setMaximumSequenceLength(1)
+        self.set_combo(combo)
+        self.editingFinished.connect(lambda: self.committed.emit(self.combo()))
+
+    def combo(self) -> str:
+        return self.keySequence().toString(QKeySequence.SequenceFormat.PortableText)
+
+    def set_combo(self, combo: str) -> None:
+        self.blockSignals(True)
+        self.setKeySequence(QKeySequence(combo))
+        self.blockSignals(False)
 
 
 class ProgressBar(QWidget, _Themed):

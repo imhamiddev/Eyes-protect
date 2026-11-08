@@ -82,6 +82,11 @@ QSpinBox {{ background: {p.surface_raised}; border: 1px solid {p.border}; border
 QSpinBox:focus {{ border: 1px solid {p.accent}; }}
 QSpinBox::up-button, QSpinBox::down-button {{ width: 0; border: none; }}
 
+QKeySequenceEdit {{ background: {p.surface_raised}; border: 1px solid {p.border};
+  border-radius: {R['md']}px; min-height: {tokens.SIZE['control_h']}px; min-width: 190px; }}
+QKeySequenceEdit:focus {{ border: 1px solid {p.accent}; }}
+QKeySequenceEdit QLineEdit {{ background: transparent; border: none; padding: 0 10px; }}
+
 QScrollArea {{ border: none; background: transparent; }}
 QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px; }}
 QScrollBar::handle:vertical {{ background: {p.border}; border-radius: 4px; min-height: 30px; }}

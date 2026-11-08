@@ -52,6 +52,7 @@ class Engine(QObject):
         self.settings = settings or load_settings(settings_path)
         self.stats = stats or Stats()
         self.paused = False
+        self.hotkey_failures: set[str] = set()  # actions whose shortcut could not be registered
         self.quiet_until = 0.0           # epoch seconds; inf = until switched off
         self.busy_reason: str | None = None   # set by smart pause (e.g. 'fullscreen')
         s = self.settings

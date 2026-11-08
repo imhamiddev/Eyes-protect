@@ -127,3 +127,31 @@ def test_engine_emits_posture_reminder(ea):
     for _ in range(60):
         ea.engine.on_tick()
     assert seen == [1]
+
+
+def test_hotkey_actions_drive_the_engine(ea):
+    e = ea.engine
+    before = e.settings.night_light.enabled
+    ea.on_hotkey("night_light")
+    assert e.settings.night_light.enabled is (not before) and ea.toasts.count() == 1
+    ea.on_hotkey("pause")
+    assert e.paused is True
+    ea.on_hotkey("pause")
+    assert e.paused is False
+    ea.on_hotkey("quiet")
+    assert e.quiet_active
+    ea.on_hotkey("quiet")
+    assert not e.quiet_active
+    ea.on_hotkey("break_now")
+    assert e.rule.phase.value == "break"
+
+
+def test_changed_hotkey_settings_reregister(ea, monkeypatch):
+    calls = []
+    monkeypatch.setattr(ea.hotkeys, "register", lambda en, m: calls.append((en, dict(m))) or set())
+    ea.engine.settings.hotkeys.enabled = False
+    ea.engine.commit_settings()
+    assert calls and calls[-1][0] is False
+    n = len(calls)
+    ea.engine.commit_settings()          # nothing changed -> no re-registration
+    assert len(calls) == n

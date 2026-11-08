@@ -322,3 +322,35 @@ def test_exercises_page_has_eye_and_body_sections(engine):
     p = ExercisesPage(engine)
     starts = [b for b in p.findChildren(AnimatedButton) if b.text() == i18n.tr("ex.start")]
     assert len(starts) == len(ALL_EXERCISES)
+
+
+def test_settings_shortcut_edit_saves_and_registers(engine):
+    p = SettingsPage(engine)
+    p.hk_edits["night_light"].set_combo("Ctrl+Shift+L")
+    p.hk_edits["night_light"].committed.emit("Ctrl+Shift+L")
+    assert engine.settings.hotkeys.night_light == "Ctrl+Shift+L"
+    p.hk_edits["pause"].committed.emit("alt+ctrl+k")      # normalized spelling
+    assert engine.settings.hotkeys.pause == "Ctrl+Alt+K"
+
+
+def test_settings_shortcut_rejects_invalid_and_duplicates(engine):
+    p = SettingsPage(engine)
+    before = engine.settings.hotkeys.break_now
+    p.hk_edits["break_now"].committed.emit("B")             # no modifier
+    assert engine.settings.hotkeys.break_now == before
+    assert p.hk_rows["break_now"].desc.text() == i18n.tr("hk.invalid")
+    p.hk_edits["break_now"].committed.emit(engine.settings.hotkeys.pause)  # duplicate of another action
+    assert engine.settings.hotkeys.break_now == before
+    assert p.hk_rows["break_now"].desc.text() == i18n.tr("hk.duplicate")
+    p.hk_edits["break_now"].committed.emit("Ctrl+Alt+J")    # fixed -> message clears
+    assert engine.settings.hotkeys.break_now == "Ctrl+Alt+J"
+    assert p.hk_rows["break_now"].desc.text() == ""
+
+
+def test_settings_shortcut_toggle_and_in_use_message(engine):
+    p = SettingsPage(engine)
+    engine.hotkey_failures = {"quiet"}
+    p.refresh()
+    assert p.hk_rows["quiet"].desc.text() == i18n.tr("hk.in_use")
+    p.hk_on.setChecked(False)
+    assert engine.settings.hotkeys.enabled is False and not p.hk_edits["pause"].isEnabled()

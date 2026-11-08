@@ -6,11 +6,13 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from eyecare import APP_NAME, __version__
+from eyecare.core import hotkeys as hk
 from eyecare.core.i18n import tr
 from eyecare.updates import State
 
 from ..widgets import (
-    AnimatedButton, Dropdown, ProgressBar, Segmented, SettingRow, Toggle, secondary_button,
+    AnimatedButton, Dropdown, ProgressBar, Segmented, SettingRow, ShortcutEdit, Toggle,
+    secondary_button,
 )
 from .base import Page
 
@@ -49,6 +51,20 @@ class SettingsPage(Page):
             self.progress_box,
         )
 
+        self.section(tr("set.hotkeys"))
+        self.hk_on = Toggle()
+        self.hk_edits: dict[str, ShortcutEdit] = {}
+        self.hk_rows: dict[str, SettingRow] = {}
+        self._hk_errors: dict[str, str] = {}
+        rows = [SettingRow(tr("set.hotkeys"), tr("set.hotkeys_desc"), self.hk_on)]
+        for action in hk.ACTIONS:
+            edit = ShortcutEdit(hk.DEFAULTS[action])
+            edit.committed.connect(lambda combo, a=action: self._hotkey_edited(a, combo))
+            row = SettingRow(tr(f"hk.{action}"), "", edit)
+            self.hk_edits[action], self.hk_rows[action] = edit, row
+            rows.append(row)
+        self.card(*rows)
+
         self.section(tr("set.about"))
         self.author_btn = AnimatedButton(tr("set.made_by"), "external-link", "ghost", align="start")
         self.author_btn.setToolTip(tr("set.open_github"))
@@ -66,6 +82,7 @@ class SettingsPage(Page):
         self.autostart.toggled.connect(self._save)
         self.animations.toggled.connect(self._save)
         self.auto_update.toggled.connect(self._save)
+        self.hk_on.toggled.connect(self._save)
         self.update_btn.clicked.connect(self._on_update_clicked)
         engine.updates.changed.connect(self._refresh_update)
         self.load()
@@ -134,7 +151,13 @@ class SettingsPage(Page):
         self.autostart.setChecked(g.autostart)
         self.animations.setChecked(g.animations)
         self.auto_update.setChecked(g.auto_update)
+        h = self.engine.settings.hotkeys
+        self.hk_on.setChecked(h.enabled)
+        for action, edit in self.hk_edits.items():
+            edit.set_combo(getattr(h, action))
+            edit.setEnabled(h.enabled)
         self._loading = False
+        self._hotkey_status()
 
     def _save(self, *_args) -> None:
         if self._loading:
@@ -145,4 +168,39 @@ class SettingsPage(Page):
         g.autostart = self.autostart.isChecked()
         g.animations = self.animations.isChecked()
         g.auto_update = self.auto_update.isChecked()
+        self.engine.settings.hotkeys.enabled = self.hk_on.isChecked()
+        for edit in self.hk_edits.values():
+            edit.setEnabled(self.hk_on.isChecked())
         self.engine.commit_settings()
+
+    # -- shortcuts --------------------------------------------------------
+    def _hotkey_edited(self, action: str, combo: str) -> None:
+        h = self.engine.settings.hotkeys
+        message = ""
+        try:
+            canonical = hk.normalize(combo)
+        except ValueError:
+            canonical, message = "", tr("hk.invalid")
+        if canonical:
+            clash = any(a != action and hk.normalize(getattr(h, a)) == canonical for a in hk.ACTIONS)
+            if clash:
+                canonical, message = "", tr("hk.duplicate")
+        if not canonical:  # reject: restore the previous shortcut and explain why
+            self.hk_edits[action].set_combo(getattr(h, action))
+            self._hk_errors[action] = message
+            self._hotkey_status()
+            return
+        self._hk_errors.pop(action, None)
+        setattr(h, action, canonical)
+        self.hk_edits[action].set_combo(canonical)
+        self.engine.commit_settings()
+        self._hotkey_status()
+
+    def _hotkey_status(self) -> None:
+        failed = self.engine.hotkey_failures
+        for action, row in self.hk_rows.items():
+            note = self._hk_errors.get(action) or (tr("hk.in_use") if action in failed else "")
+            row.set_texts(tr(f"hk.{action}"), note)
+
+    def refresh(self) -> None:
+        self._hotkey_status()
