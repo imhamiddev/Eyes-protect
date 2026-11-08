@@ -16,9 +16,10 @@ def close(a, b, tol=8):
 
 def test_tehran_summer_and_winter():
     s = sun_times(date(2024, 6, 21), 35.6892, 51.3890, 3.5)
-    assert close(s.sunrise, hm(5, 44)) and close(s.sunset, hm(20, 25))
+    # Iran has used a fixed UTC+3:30 since 2022 (no daylight saving)
+    assert close(s.sunrise, hm(4, 48)) and close(s.sunset, hm(19, 25))
     w = sun_times(date(2024, 12, 21), 35.6892, 51.3890, 3.5)
-    assert close(w.sunrise, hm(7, 0)) and close(w.sunset, hm(17, 8))
+    assert close(w.sunrise, hm(7, 12)) and close(w.sunset, hm(16, 55))
     assert w.sunset < s.sunset
 
 
