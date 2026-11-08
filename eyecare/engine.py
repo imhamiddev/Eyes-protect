@@ -6,17 +6,19 @@ import sys
 import time
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QTimer, Signal
+from PySide6.QtCore import QEasingCurve, QObject, QTimer, QVariantAnimation, Signal
 
 from eyecare.core import winapi
 from eyecare.core.colortemp import build_ramp, channel_multipliers
 from eyecare.core.config import Settings, load_settings, save_settings
 from eyecare.core.stats import Stats
-from eyecare.core.timeutil import now_time
+from eyecare.core.cities import city_by_key
+from eyecare.core.timeutil import now_precise, now_time
 from eyecare.features import rule202020 as rule_mod
 from eyecare.features.display import DisplayState, compute_display_state, wants_light_theme
 from eyecare.features.interval import IntervalReminder
 from eyecare.features.smartpause import Debouncer, classify
+from eyecare.ui import motion
 from eyecare.updates import UpdateManager
 
 DISPLAY_REAPPLY_SECONDS = 60
@@ -55,7 +57,14 @@ class Engine(QObject):
         self.blink = IntervalReminder(s.blink.interval_min, s.blink.enabled)
         self.water = IntervalReminder(s.hydration.interval_min, s.hydration.enabled)
         self.display_state = DisplayState()
-        self._last_applied: tuple | None = None
+        self._shown: DisplayState | None = None
+        self._from = self._to = DisplayState()
+        self._tween = QVariantAnimation(self)
+        self._tween.setStartValue(0.0)
+        self._tween.setEndValue(1.0)
+        self._tween.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        self._tween.valueChanged.connect(self._on_tween)
+        self._tween.finished.connect(lambda: self._push(self._to) if self._shown != self._to else None)
         self._since_apply = DISPLAY_REAPPLY_SECONDS
         self._last_theme_target: bool | None = None
         self.updates = UpdateManager(self)
@@ -103,19 +112,52 @@ class Engine(QObject):
         winapi.set_autostart(self.settings.general.autostart, launch_command())
 
     # -- display ----------------------------------------------------------
-    def apply_display(self, force: bool = False) -> None:
-        state = compute_display_state(self.settings.night_light, self.settings.dimmer, now_time())
-        key = (state.kelvin, round(state.brightness, 3))
-        if force or key != self._last_applied or self._since_apply >= DISPLAY_REAPPLY_SECONDS:
-            if state.is_neutral:
-                winapi.reset_gamma()
-            else:
-                winapi.set_gamma_ramp(build_ramp(channel_multipliers(state.kelvin, state.brightness)))
-            self._since_apply = 0
-        if key != self._last_applied:
-            self._last_applied = key
+    def _target_state(self) -> DisplayState:
+        city = city_by_key(self.settings.location.city)
+        return compute_display_state(self.settings.night_light, self.settings.dimmer,
+                                     now_precise(), city)
+
+    def _apply_gamma(self, state: DisplayState) -> None:
+        if state.is_neutral:
+            winapi.reset_gamma()
+        else:
+            winapi.set_gamma_ramp(build_ramp(channel_multipliers(state.kelvin, state.brightness)))
+
+    def _push(self, state: DisplayState) -> None:
+        """Send ``state`` to the screen now."""
+        changed = self._shown is None or (state.kelvin, round(state.brightness, 3)) != (
+            self._shown.kelvin, round(self._shown.brightness, 3))
+        self._apply_gamma(state)
+        self._since_apply = 0
+        self._shown = state
+        if changed:
             self.display_state = state
             self.display_changed.emit(state)
+
+    def apply_display(self, force: bool = False) -> None:
+        target = self._target_state()
+        if self._tween.state() == QVariantAnimation.State.Running:
+            self._tween.stop()
+        shown = self._shown
+        if shown is None:
+            self._push(target)
+            return
+        if target == shown:
+            if force or self._since_apply >= DISPLAY_REAPPLY_SECONDS:
+                self._push(shown)  # some drivers/apps silently reset the ramp
+            return
+        big = abs(target.kelvin - shown.kelvin) > 150 or abs(target.brightness - shown.brightness) > 0.08
+        if big and motion.ms(1):
+            self._from, self._to = shown, target
+            self._tween.setDuration(700)
+            self._tween.start()
+        else:
+            self._push(target)
+
+    def _on_tween(self, t) -> None:
+        a, b, t = self._from, self._to, float(t)
+        self._push(DisplayState(round(a.kelvin + (b.kelvin - a.kelvin) * t),
+                                a.brightness + (b.brightness - a.brightness) * t))
 
     def toggle_night_light(self) -> bool:
         nl = self.settings.night_light

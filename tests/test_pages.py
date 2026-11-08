@@ -191,3 +191,31 @@ def test_care_smart_pause_switches(engine):
     p.smart_on.setChecked(True)
     p.smart_meet.setChecked(False)
     assert engine.settings.smart_pause.meetings is False
+
+
+def test_display_sun_mode_and_city(engine):
+    p = DisplayPage(engine)
+    assert not p.city_row.isEnabled() and p.start_row.isEnabled()
+    p.nl_sun.setChecked(True)
+    s = engine.settings
+    assert s.night_light.sun is True
+    assert p.city_row.isEnabled() and not p.start_row.isEnabled()
+    assert "Sunset" in p.sun_row.desc.text() or "Sun" in p.sun_row.desc.text()
+    keys = [c.key for c in __import__("eyecare.core.cities", fromlist=["CITIES"]).CITIES]
+    p.city.setCurrentIndex(keys.index("mashhad"))
+    assert s.location.city == "mashhad"
+    p.transition.set_value(45)
+    assert s.night_light.transition_min == 45
+
+
+def test_display_schedule_off_disables_schedule_controls(engine):
+    p = DisplayPage(engine)
+    p.nl_schedule.setChecked(False)
+    assert not p.sun_row.isEnabled() and not p.transition.isEnabled()
+    assert not p.start_row.isEnabled()
+
+
+def test_dimmer_sun_toggle(engine):
+    p = DisplayPage(engine)
+    p.dim_sun.setChecked(True)
+    assert engine.settings.dimmer.sun is True
