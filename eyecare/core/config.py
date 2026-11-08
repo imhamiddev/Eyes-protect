@@ -25,6 +25,7 @@ class General:
     animations: bool = True
     auto_update: bool = True
     last_update_check: float = 0.0
+    daily_break_goal: int = 6
 
 
 @dataclass

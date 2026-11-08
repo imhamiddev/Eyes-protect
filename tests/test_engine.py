@@ -173,3 +173,36 @@ def test_monitor_hotplug_is_detected(app, tmp_path, monkeypatch):
     monkeypatch.setattr(winapi, "list_monitors", lambda: mons[:1])
     assert e.refresh_monitors() is True and len(e.monitors) == 1
     assert e.refresh_monitors() is False
+
+
+def test_active_time_and_longest_stretch_are_tracked(app, tmp_path):
+    e = make(tmp_path, detect_natural_breaks=False)
+    for _ in range(90):
+        e.on_tick()
+    assert e.stats.get("active_s") == 90 and e.stats.get("longest_run_s") == 90
+
+
+def test_idle_time_is_not_counted_and_resets_the_run(app, tmp_path, monkeypatch):
+    from eyecare.core import winapi
+
+    e = make(tmp_path, detect_natural_breaks=False)
+    for _ in range(40):
+        e.on_tick()
+    monkeypatch.setattr(winapi, "idle_seconds", lambda: 300.0)
+    for _ in range(30):
+        e.on_tick()
+    monkeypatch.setattr(winapi, "idle_seconds", lambda: 0.0)
+    for _ in range(10):
+        e.on_tick()
+    assert e.stats.get("active_s") == 50           # 40 + 10, the idle 30 s excluded
+    assert e.stats.get("longest_run_s") == 40      # the run restarted after the rest
+
+
+def test_taking_a_break_restarts_the_stretch(app, tmp_path):
+    e = make(tmp_path, detect_natural_breaks=False)
+    for _ in range(30):
+        e.on_tick()
+    e.start_break()
+    for _ in range(3):
+        e.on_tick()
+    assert e._run_seconds <= 1

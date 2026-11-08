@@ -35,3 +35,14 @@ def test_format_mmss():
     assert format_mmss(0) == "00:00"
     assert format_mmss(75) == "01:15"
     assert format_mmss(-5) == "00:00"
+
+
+def test_format_duration():
+    from eyecare.core.timeutil import format_duration
+
+    assert format_duration(0) == "0 min" and format_duration(59) == "0 min"
+    assert format_duration(48 * 60) == "48 min"
+    assert format_duration(3 * 3600 + 25 * 60) == "3 h 25 min"
+    assert format_duration(2 * 3600) == "2 h"
+    assert format_duration(90, "ساعت", "دقیقه") == "1 دقیقه"
+    assert format_duration(-5) == "0 min"

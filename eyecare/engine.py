@@ -72,6 +72,7 @@ class Engine(QObject):
         self.updates = UpdateManager(self)
         self._smart = Debouncer(2)
         self._poll_count = 0
+        self._run_seconds = 0   # continuous screen time since the last break
         self._timer = QTimer(self)
         self._timer.setInterval(1000)
         self._timer.timeout.connect(self.on_tick)
@@ -247,6 +248,7 @@ class Engine(QObject):
             self.state_changed.emit()
         self.apply_display()
         self._apply_auto_theme()
+        self._track_activity(idle)
         if self.quiet_until and not self.quiet_active:
             self.quiet_until = 0.0  # quiet period ran out
         hold = self.holding
@@ -260,6 +262,18 @@ class Engine(QObject):
             self.water_requested.emit()
         self.state_changed.emit()
 
+    def _track_activity(self, idle: float) -> None:
+        """Screen time and the longest stretch without a break (kept even while quiet)."""
+        if idle >= self.settings.rule202020.break_seconds:
+            self._run_seconds = 0      # away long enough: counts as a rest
+        if idle < 60:
+            self.stats.add("active_s", save=False)
+        if idle < 5:
+            self._run_seconds += 1
+            self.stats.record_max("longest_run_s", self._run_seconds, save=False)
+        if self._poll_count % 30 == 0:
+            self.stats.save()
+
     def _handle(self, events: list[str]) -> None:
         for event in events:
             if event == rule_mod.PROMPT:
@@ -267,12 +281,15 @@ class Engine(QObject):
             elif event == rule_mod.BREAK_START:
                 self.break_started.emit(self.settings.rule202020.break_seconds)
             elif event == rule_mod.BREAK_DONE:
+                self._run_seconds = 0
                 self.stats.add("breaks")
                 self.break_finished.emit(True)
             elif event == rule_mod.BREAK_SKIPPED:
+                self._run_seconds = 0
                 self.stats.add("skipped")
                 self.break_finished.emit(False)
             elif event == rule_mod.NATURAL_BREAK:
+                self._run_seconds = 0
                 self.stats.add("breaks")
                 self.natural_break.emit()
 
