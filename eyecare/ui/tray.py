@@ -28,8 +28,22 @@ class Tray(QObject):
         self.night_action = QAction()
         self.night_action.setCheckable(True)
         self.quit_action = QAction()
+        self.meeting_action = QAction()
+        self.quiet_end_action = QAction()
+        self.quiet_menu = QMenu()
+        self.quiet_actions: list[tuple[QAction, float | None, str]] = []
+        for key, minutes in (("quiet.30", 30), ("quiet.60", 60), ("quiet.120", 120),
+                             ("quiet.240", 240), ("quiet.forever", None)):
+            act = QAction()
+            act.triggered.connect(lambda _=False, m=minutes: engine.set_quiet(m))
+            self.quiet_menu.addAction(act)
+            self.quiet_actions.append((act, minutes, key))
         for a in (self.open_action, self.pause_action, self.break_action, self.night_action):
             self.menu.addAction(a)
+        self.menu.addSeparator()
+        self.menu.addAction(self.meeting_action)
+        self.quiet_menu_action = self.menu.addMenu(self.quiet_menu)
+        self.menu.addAction(self.quiet_end_action)
         self.menu.addSeparator()
         self.menu.addAction(self.quit_action)
         self.icon.setContextMenu(self.menu)
@@ -38,6 +52,8 @@ class Tray(QObject):
         self.pause_action.triggered.connect(lambda: engine.set_paused(not engine.paused))
         self.break_action.triggered.connect(engine.start_break)
         self.night_action.triggered.connect(lambda: engine.toggle_night_light())
+        self.meeting_action.triggered.connect(lambda: engine.set_quiet(60))
+        self.quiet_end_action.triggered.connect(lambda: engine.set_quiet(0))
         self.quit_action.triggered.connect(self.quit_requested)
         self.icon.activated.connect(self._activated)
         engine.state_changed.connect(self.retranslate)
@@ -55,6 +71,13 @@ class Tray(QObject):
         self.night_action.setText(tr("tray.night"))
         self.night_action.setChecked(self.engine.settings.night_light.enabled)
         self.quit_action.setText(tr("tray.quit"))
+        self.meeting_action.setText(tr("tray.meeting"))
+        self.quiet_menu.setTitle(tr("tray.quiet"))
+        self.quiet_menu_action.setText(tr("tray.quiet"))
+        for act, _minutes, key in self.quiet_actions:
+            act.setText(tr(key))
+        self.quiet_end_action.setText(tr("tray.quiet_end"))
+        self.quiet_end_action.setVisible(self.engine.quiet_active)
 
     def show(self) -> None:
         self.icon.show()
