@@ -44,3 +44,12 @@ def now_precise() -> time:
 
 def minutes_precise(value: time) -> float:
     return value.hour * 60 + value.minute + value.second / 60
+
+
+def format_duration(total_seconds: int, hour_unit: str = "h", minute_unit: str = "min") -> str:
+    """'3 h 25 min', '48 min', '0 min' (seconds are dropped)."""
+    minutes = max(0, int(total_seconds)) // 60
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours} {hour_unit} {minutes} {minute_unit}" if minutes else f"{hours} {hour_unit}"
+    return f"{minutes} {minute_unit}"

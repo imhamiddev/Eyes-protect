@@ -335,12 +335,15 @@ class SmoothSlider(QSlider):
 class ValueLabel(QWidget):
     """Number/text that rolls vertically when it changes (odometer effect)."""
 
-    def __init__(self, text: str = "", min_width: int = 40, parent: QWidget | None = None):
+    def __init__(self, text: str = "", min_width: int = 40, px: int | None = None,
+                 align: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignCenter, parent: QWidget | None = None):
         super().__init__(parent)
         self._old, self._new, self._dir = text, text, 1
+        self._px = px or tokens.FONT_SIZE["title"]
+        self._align = align | Qt.AlignmentFlag.AlignVCenter
         self._t = Tween(self, self.update, 1.0, 200)
         self.setMinimumWidth(min_width)
-        self.setFixedHeight(28)
+        self.setFixedHeight(28 if px is None else int(px * 1.6))
         theme.changed.connect(self.update)
 
     def text(self) -> str:
@@ -361,17 +364,17 @@ class ValueLabel(QWidget):
         self._t.to(1.0)
 
     def sizeHint(self) -> QSize:  # noqa: N802
-        return QSize(self.minimumWidth(), 28)
+        return QSize(self.minimumWidth(), self.height())
 
     def paintEvent(self, _e) -> None:  # noqa: N802
         p, pal = QPainter(self), current()
         p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
         f = QFont(self.font())
-        f.setPixelSize(tokens.FONT_SIZE["title"])
+        f.setPixelSize(self._px)
         f.setWeight(QFont.Weight.DemiBold)
         p.setFont(f)
         t, h = self._t.value, self.height()
-        flags = Qt.AlignmentFlag.AlignCenter
+        flags = self._align
         base = qcolor(pal.text)
         if t >= 0.999:
             p.setPen(base)

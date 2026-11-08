@@ -18,6 +18,7 @@ from .pages.care import CarePage
 from .pages.display import DisplayPage
 from .pages.exercises import ExercisesPage
 from .pages.home import HomePage
+from .pages.stats import StatsPage
 from .pages.settings import SettingsPage
 from . import motion
 from .controls import AnimatedButton
@@ -26,6 +27,7 @@ from .widgets import Toggle, label
 
 NAV = [
     ("nav.home", "dashboard", HomePage),
+    ("nav.stats", "chart", StatsPage),
     ("nav.care", "eye", CarePage),
     ("nav.display", "moon", DisplayPage),
     ("nav.exercises", "activity", ExercisesPage),

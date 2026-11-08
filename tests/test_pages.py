@@ -244,3 +244,44 @@ def test_display_monitor_rows_follow_settings(engine, monkeypatch):
 def test_display_hides_monitor_card_for_a_single_screen(engine):
     p = DisplayPage(engine)
     assert p.monitor_card.isHidden() and p.monitor_title.isHidden()
+
+
+def test_stats_page_shows_numbers_goal_and_report(engine):
+    from datetime import date, timedelta
+
+    from eyecare.ui.pages.stats import StatsPage
+
+    st, today = engine.stats, date.today()
+    st.add("breaks", today, 4)
+    st.add("breaks", today - timedelta(days=1), 6)
+    st.add("active_s", today, 3 * 3600 + 25 * 60)
+    st.record_max("longest_run_s", 48 * 60, today)
+    st.add("water", today, 5)
+    p = StatsPage(engine)
+    assert p.t_active.value.text() == "3 h 25 min"
+    assert p.t_longest.value.text() == "48 min"
+    assert p.t_streak.value.text() == "1 days"
+    assert p.ring.progress >= 0 and "4/6" in p.ring._text
+    assert "10 breaks" in p.r_totals.text() and "Best day" in p.r_best.text()
+    assert "5 glasses" in p.r_water.text()
+    p.seg.set_index(1)
+    assert p.chart.values[-1] == 205
+    p.seg.set_index(2)
+    assert p.chart.values[-1] == 5
+
+
+def test_stats_goal_stepper_saves_and_refreshes(engine):
+    from eyecare.ui.pages.stats import StatsPage
+
+    p = StatsPage(engine)
+    p.goal.set_value(10)
+    assert engine.settings.general.daily_break_goal == 10
+    assert "/10" in p.ring._text
+
+
+def test_stats_page_empty_state(engine):
+    from eyecare.ui.pages.stats import StatsPage
+
+    p = StatsPage(engine)
+    assert "No data" in p.r_totals.text() and p.r_best.isHidden()
+    p.grab()
