@@ -55,6 +55,14 @@ class CarePage(Page):
             SettingRow(tr("care.interval"), "", self.blink_int),
         )
 
+        self.section(tr("care.posture"))
+        self.posture_on = Toggle()
+        self.posture_int = Stepper(10, 180, s.posture.interval_min, step=5)
+        self.card(
+            SettingRow(tr("care.posture"), tr("care.posture_desc"), self.posture_on),
+            SettingRow(tr("care.interval"), "", self.posture_int),
+        )
+
         self.section(tr("care.hydration"))
         self.water_on = Toggle()
         self.water_int = Stepper(5, 240, s.hydration.interval_min, step=5)
@@ -67,9 +75,10 @@ class CarePage(Page):
         self.finish()
 
         for toggle in (self.rule_on, self.natural, self.lock, self.skippable, self.blink_on, self.water_on,
-                       self.smart_on, self.smart_full, self.smart_meet, self.smart_focus):
+                       self.smart_on, self.smart_full, self.smart_meet, self.smart_focus,
+                       self.posture_on):
             toggle.toggled.connect(self._save)
-        for stepper in (self.interval, self.length, self.snooze, self.blink_int, self.water_int):
+        for stepper in (self.interval, self.length, self.snooze, self.blink_int, self.water_int, self.posture_int):
             stepper.valueChanged.connect(self._save)
         self.drank.clicked.connect(self.engine.record_water)
         self.load()
@@ -93,6 +102,8 @@ class CarePage(Page):
             t.setEnabled(sp.enabled)
         self.blink_on.setChecked(s.blink.enabled)
         self.blink_int.set_value(s.blink.interval_min, emit=False)
+        self.posture_on.setChecked(s.posture.enabled)
+        self.posture_int.set_value(s.posture.interval_min, emit=False)
         self.water_on.setChecked(s.hydration.enabled)
         self.water_int.set_value(s.hydration.interval_min, emit=False)
         self._loading = False
@@ -115,6 +126,8 @@ class CarePage(Page):
             t.setEnabled(sp.enabled)
         s.blink.enabled = self.blink_on.isChecked()
         s.blink.interval_min = self.blink_int.value()
+        s.posture.enabled = self.posture_on.isChecked()
+        s.posture.interval_min = self.posture_int.value()
         s.hydration.enabled = self.water_on.isChecked()
         s.hydration.interval_min = self.water_int.value()
         self.engine.commit_settings()

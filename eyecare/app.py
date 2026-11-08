@@ -1,6 +1,7 @@
 """Application controller: wires the engine to windows, toasts, tray and theme."""
 from __future__ import annotations
 
+import random
 import sys
 
 from PySide6.QtCore import QLockFile, Qt, QTimer
@@ -12,7 +13,9 @@ from eyecare.core.config import config_dir
 from eyecare.engine import Engine
 from eyecare.features.rule202020 import Phase
 from eyecare.ui import brand, fonts, motion
+from eyecare.core.exercises import STRETCHES
 from eyecare.ui.break_overlay import BreakOverlay
+from eyecare.ui.pages.exercises import ExerciseRunner
 from eyecare.ui.main_window import MainWindow
 from eyecare.ui.theme import theme
 from eyecare.ui.toast import ToastManager
@@ -33,6 +36,7 @@ class EyeCareApp:
         self.tray: Tray | None = None
         self._prompt_toast = None
         self._mini_toast = None
+        self._stretch = None
         self._applied: tuple[str, str] | None = None
 
         motion.set_enabled(self.engine.settings.general.animations)
@@ -48,6 +52,7 @@ class EyeCareApp:
         e.break_tick.connect(self.on_break_tick)
         e.break_finished.connect(self.on_break_finished)
         e.blink_requested.connect(self.on_blink)
+        e.posture_requested.connect(self.on_posture)
         e.water_requested.connect(self.on_water)
         e.natural_break.connect(self.on_natural_break)
         e.settings_changed.connect(self.on_settings_changed)
@@ -170,6 +175,20 @@ class EyeCareApp:
         self.engine.record_blink_shown()
         self.toasts.show("eye", i18n.tr("toast.blink_title"), i18n.tr("toast.blink_body"),
                          [], timeout_ms=BLINK_TOAST_MS)
+
+    def on_posture(self) -> None:
+        self.toasts.show(
+            "person", i18n.tr("toast.posture_title"), i18n.tr("toast.posture_body"),
+            [(i18n.tr("toast.posture_start"), self.start_stretch, True),
+             (i18n.tr("toast.dismiss"), lambda: None, False)],
+            timeout_ms=20_000)
+
+    def start_stretch(self, exercise=None) -> ExerciseRunner:
+        self._stretch = ExerciseRunner(exercise or random.choice(STRETCHES), None, self.engine)
+        self._stretch.show()
+        self._stretch.raise_()
+        self._stretch.activateWindow()
+        return self._stretch
 
     def on_water(self) -> None:
         self.toasts.show("droplet", i18n.tr("toast.water_title"), i18n.tr("toast.water_body"),
