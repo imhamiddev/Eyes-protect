@@ -85,6 +85,14 @@ class BreakLock:
 
 
 @dataclass
+class SmartPause:
+    enabled: bool = True
+    fullscreen: bool = True      # full-screen apps, games, presentations
+    meetings: bool = True        # Zoom / Teams / Meet / Webex ...
+    focus_assist: bool = True    # respect Windows Focus assist (quiet hours)
+
+
+@dataclass
 class Settings:
     general: General = field(default_factory=General)
     rule202020: Rule202020 = field(default_factory=Rule202020)
@@ -94,6 +102,7 @@ class Settings:
     dimmer: Dimmer = field(default_factory=Dimmer)
     auto_dark: AutoDarkMode = field(default_factory=AutoDarkMode)
     break_lock: BreakLock = field(default_factory=BreakLock)
+    smart_pause: SmartPause = field(default_factory=SmartPause)
 
 
 def _merge(target: Any, data: dict) -> None:

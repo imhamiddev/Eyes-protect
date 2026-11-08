@@ -23,6 +23,15 @@ if IS_WINDOWS:
     class _LASTINPUTINFO(ctypes.Structure):
         _fields_ = [("cbSize", wintypes.UINT), ("dwTime", wintypes.DWORD)]
 
+    _shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+    _user32.GetForegroundWindow.restype = wintypes.HWND
+    _user32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+    _user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    _kernel32.OpenProcess.restype = wintypes.HANDLE
+    _kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    _kernel32.QueryFullProcessImageNameW.argtypes = [
+        wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
+    _kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
     _user32.GetDC.restype = wintypes.HDC
     _user32.GetDC.argtypes = [wintypes.HWND]
     _user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
@@ -135,3 +144,40 @@ def create_single_instance_mutex(name: str = "EyeCareSingleInstanceMutex") -> bo
     if handle:
         _mutex_handles.append(handle)  # keep it alive for the process lifetime
     return bool(handle)
+
+
+def notification_state() -> int | None:
+    """SHQueryUserNotificationState: 2/3/4/7 = full-screen app, game or presentation,
+    6 = quiet time (Focus assist). None when unavailable."""
+    if not IS_WINDOWS:
+        return None
+    state = ctypes.c_int(0)
+    try:
+        hr = _shell32.SHQueryUserNotificationState(ctypes.byref(state))
+    except OSError:
+        return None
+    return state.value if hr == 0 else None
+
+
+def foreground_info() -> tuple[int, str, str] | None:
+    """(process id, lower-case exe name, window title) of the foreground window."""
+    if not IS_WINDOWS:
+        return None
+    hwnd = _user32.GetForegroundWindow()
+    if not hwnd:
+        return None
+    pid = wintypes.DWORD(0)
+    _user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    title_buf = ctypes.create_unicode_buffer(512)
+    _user32.GetWindowTextW(hwnd, title_buf, 512)
+    exe = ""
+    handle = _kernel32.OpenProcess(0x1000, False, pid.value)  # PROCESS_QUERY_LIMITED_INFORMATION
+    if handle:
+        try:
+            size = wintypes.DWORD(1024)
+            buf = ctypes.create_unicode_buffer(1024)
+            if _kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size)):
+                exe = buf.value.replace("\\", "/").rsplit("/", 1)[-1].lower()
+        finally:
+            _kernel32.CloseHandle(handle)
+    return pid.value, exe, title_buf.value
