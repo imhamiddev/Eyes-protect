@@ -10,7 +10,9 @@ from PySide6.QtWidgets import QApplication
 from eyecare import APP_NAME
 from eyecare.core import i18n, winapi
 from eyecare.core.config import config_dir
+from eyecare.core import hotkeys as hk
 from eyecare.engine import Engine
+from eyecare.hotkeys import HotkeyManager
 from eyecare.features.rule202020 import Phase
 from eyecare.ui import brand, fonts, motion
 from eyecare.core.exercises import STRETCHES
@@ -37,6 +39,8 @@ class EyeCareApp:
         self._prompt_toast = None
         self._mini_toast = None
         self._stretch = None
+        self.hotkeys = HotkeyManager()
+        self._hotkey_cfg: tuple | None = None
         self._applied: tuple[str, str] | None = None
 
         motion.set_enabled(self.engine.settings.general.animations)
@@ -60,6 +64,8 @@ class EyeCareApp:
         e.updates.update_ready.connect(self.on_update_ready)
         e.updates.quit_requested.connect(self.quit)
         self.overlay.skipped.connect(e.skip_break)
+        self.hotkeys.triggered.connect(self.on_hotkey)
+        e.settings_changed.connect(self.sync_hotkeys)
 
         self._theme_watch = QTimer()
         self._theme_watch.setInterval(5000)
@@ -108,6 +114,7 @@ class EyeCareApp:
         self.window.activateWindow()
 
     def start(self, background: bool) -> None:
+        self.sync_hotkeys()
         self.engine.start()
         if self.tray:
             self.tray.show()
@@ -119,6 +126,7 @@ class EyeCareApp:
             self.window.quitting = True
         self.overlay.end()
         self.toasts.clear()
+        self.hotkeys.shutdown()
         if self.tray:
             self.tray.hide()
         self.engine.shutdown()
@@ -201,6 +209,35 @@ class EyeCareApp:
             i18n.tr("upd.toast_body").replace("{v}", info.version),
             [(i18n.tr("upd.toast_install"), self.engine.updates.install, True),
              (i18n.tr("upd.toast_later"), lambda: None, False)])
+
+    # -- global shortcuts ---------------------------------------------------
+    def sync_hotkeys(self) -> None:
+        h = self.engine.settings.hotkeys
+        cfg = (h.enabled, h.night_light, h.break_now, h.pause, h.quiet)
+        if cfg == self._hotkey_cfg:
+            return
+        self._hotkey_cfg = cfg
+        mapping = {a: getattr(h, a) for a in hk.ACTIONS}
+        self.engine.hotkey_failures = set(self.hotkeys.register(h.enabled, mapping))
+        self.engine.state_changed.emit()
+
+    def on_hotkey(self, action: str) -> None:
+        e = self.engine
+        if action == "night_light":
+            on = e.toggle_night_light()
+            self._hotkey_toast("moon", i18n.tr("tray.night"), i18n.tr("hk.on" if on else "hk.off"))
+        elif action == "break_now":
+            e.start_break()
+        elif action == "pause":
+            e.set_paused(not e.paused)
+            self._hotkey_toast("pause" if e.paused else "play", i18n.tr("app"),
+                               i18n.tr("hk.paused" if e.paused else "hk.resumed"))
+        elif action == "quiet":
+            on = e.toggle_quiet(60)
+            self._hotkey_toast("bell", i18n.tr("app"), i18n.tr("hk.quiet_on" if on else "hk.quiet_off"))
+
+    def _hotkey_toast(self, icon: str, title: str, body: str) -> None:
+        self.toasts.show(icon, title, body, [], timeout_ms=1800)
 
     def on_natural_break(self) -> None:
         self.toasts.show("check", i18n.tr("break.done"), "", [], timeout_ms=2500)

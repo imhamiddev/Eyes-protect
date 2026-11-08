@@ -47,6 +47,8 @@ if IS_WINDOWS:
     _kernel32.QueryFullProcessImageNameW.argtypes = [
         wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
     _kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    _user32.RegisterHotKey.argtypes = [wintypes.HWND, ctypes.c_int, wintypes.UINT, wintypes.UINT]
+    _user32.UnregisterHotKey.argtypes = [wintypes.HWND, ctypes.c_int]
     _user32.GetDC.restype = wintypes.HDC
     _user32.GetDC.argtypes = [wintypes.HWND]
     _user32.ReleaseDC.argtypes = [wintypes.HWND, wintypes.HDC]
@@ -247,3 +249,15 @@ def foreground_info() -> tuple[int, str, str] | None:
         finally:
             _kernel32.CloseHandle(handle)
     return pid.value, exe, title_buf.value
+
+
+def register_hotkey(hotkey_id: int, modifiers: int, vk: int) -> bool:
+    """Register a thread-level global hotkey (WM_HOTKEY goes to the Qt event loop)."""
+    if not IS_WINDOWS:
+        return False
+    return bool(_user32.RegisterHotKey(None, hotkey_id, modifiers, vk))
+
+
+def unregister_hotkey(hotkey_id: int) -> None:
+    if IS_WINDOWS:
+        _user32.UnregisterHotKey(None, hotkey_id)

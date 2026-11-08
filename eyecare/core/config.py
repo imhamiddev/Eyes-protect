@@ -109,6 +109,15 @@ class Monitors:
 
 
 @dataclass
+class Hotkeys:
+    enabled: bool = True
+    night_light: str = "Ctrl+Alt+N"
+    break_now: str = "Ctrl+Alt+B"
+    pause: str = "Ctrl+Alt+P"
+    quiet: str = "Ctrl+Alt+Q"
+
+
+@dataclass
 class Location:
     city: str = "tehran"
 
@@ -127,6 +136,7 @@ class Settings:
     smart_pause: SmartPause = field(default_factory=SmartPause)
     location: Location = field(default_factory=Location)
     monitors: Monitors = field(default_factory=Monitors)
+    hotkeys: Hotkeys = field(default_factory=Hotkeys)
 
 
 def _merge(target: Any, data: dict) -> None:
