@@ -219,3 +219,28 @@ def test_dimmer_sun_toggle(engine):
     p = DisplayPage(engine)
     p.dim_sun.setChecked(True)
     assert engine.settings.dimmer.sun is True
+
+
+def test_display_monitor_rows_follow_settings(engine, monkeypatch):
+    from eyecare.core import winapi
+
+    mons = [winapi.Monitor("\\\\.\\DISPLAY1", 1920, 1080, True),
+            winapi.Monitor("\\\\.\\DISPLAY2", 1280, 1024, False)]
+    monkeypatch.setattr(winapi, "list_monitors", lambda: mons)
+    engine.refresh_monitors()
+    p = DisplayPage(engine)
+    assert not p.monitor_card.isHidden() or len(p._monitor_rows) == 2
+    assert set(p._monitor_rows) == {"DISPLAY1", "DISPLAY2"}
+    t2, s2 = p._monitor_rows["DISPLAY2"]
+    t2.setChecked(False)
+    assert engine.settings.monitors.excluded == "DISPLAY2" and not s2.isEnabled()
+    t1, s1 = p._monitor_rows["DISPLAY1"]
+    s1.slider.setValue(70)
+    assert engine.settings.monitors.brightness == "DISPLAY1=70"
+    t2.setChecked(True)
+    assert engine.settings.monitors.excluded == ""
+
+
+def test_display_hides_monitor_card_for_a_single_screen(engine):
+    p = DisplayPage(engine)
+    assert p.monitor_card.isHidden() and p.monitor_title.isHidden()

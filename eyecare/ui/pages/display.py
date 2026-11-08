@@ -3,7 +3,11 @@ from __future__ import annotations
 
 from datetime import date
 
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
+
 from eyecare.core import i18n
+from eyecare.core import monitors as mon
 from eyecare.core.cities import CITIES, city_by_key, city_name
 from eyecare.core.colortemp import strength_to_kelvin
 from eyecare.core.i18n import tr
@@ -64,6 +68,18 @@ class DisplayPage(Page):
             SettingRow(tr("display.from"), "", self.d_start),
             SettingRow(tr("display.to"), "", self.d_end),
         )
+
+        self.monitor_title = label(tr("display.monitors"), "Caption")
+        self.monitor_box = QWidget()
+        self.monitor_lay = QVBoxLayout(self.monitor_box)
+        self.monitor_lay.setContentsMargins(0, 0, 0, 0)
+        self.monitor_lay.setSpacing(0)
+        self._built_monitors: list = []
+        self._monitor_rows: dict[str, tuple[Toggle, LabeledSlider]] = {}
+        self.col.addSpacing(6)
+        self.col.addWidget(self.monitor_title)
+        self.monitor_card = self.card(
+            SettingRow(tr("display.monitors"), tr("display.monitors_desc"), None), self.monitor_box)
 
         self.section(tr("display.auto_dark"))
         self.ad_on = Toggle()
@@ -127,7 +143,69 @@ class DisplayPage(Page):
         self.ad_light.set_value(a.light_from)
         self.ad_dark.set_value(a.dark_from)
         self._loading = False
+        self._rebuild_monitors()
+        self._load_monitors()
         self._update_schedule_rows()
+
+    # -- monitors -----------------------------------------------------------
+    def _rebuild_monitors(self) -> None:
+        monitors = list(self.engine.monitors)
+        multi = len(monitors) > 1
+        self.monitor_title.setVisible(multi)
+        self.monitor_card.setVisible(multi)
+        if monitors == self._built_monitors:
+            return
+        self._built_monitors = monitors
+        self._monitor_rows = {}
+        while self.monitor_lay.count():
+            item = self.monitor_lay.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        for index, m in enumerate(monitors, 1):
+            k = mon.key(m.device)
+            toggle = Toggle(True)
+            slider = LabeledSlider(30, 100, 100)
+            slider.setMinimumWidth(190)
+            box = QWidget()
+            lay = QHBoxLayout(box)
+            lay.setContentsMargins(0, 0, 0, 0)
+            lay.setSpacing(16)
+            lay.addWidget(slider)
+            lay.addWidget(toggle)
+            title = tr("display.monitor").replace("{n}", str(index))
+            desc = f"{m.width}×{m.height}" + (f" · {tr('display.main')}" if m.primary else "")
+            self.monitor_lay.addWidget(SettingRow(title, desc, box))
+            self._monitor_rows[k] = (toggle, slider)
+            toggle.toggled.connect(self._save_monitors)
+            slider.valueChanged.connect(self._save_monitors)
+        self._load_monitors()
+
+    def _load_monitors(self) -> None:
+        excluded = mon.parse_set(self.engine.settings.monitors.excluded)
+        factors = mon.parse_map(self.engine.settings.monitors.brightness)
+        self._loading = True
+        for k, (toggle, slider) in self._monitor_rows.items():
+            toggle.setChecked(k not in excluded)
+            slider.set_value(factors.get(k, 100))
+            slider.setEnabled(k not in excluded)
+        self._loading = False
+
+    def _save_monitors(self, *_args) -> None:
+        if self._loading:
+            return
+        excluded, factors = set(), {}
+        for k, (toggle, slider) in self._monitor_rows.items():
+            if not toggle.isChecked():
+                excluded.add(k)
+            if slider.value() < 100:
+                factors[k] = slider.value()
+            slider.setEnabled(toggle.isChecked())
+        m = self.engine.settings.monitors
+        m.excluded, m.brightness = mon.format_set(excluded), mon.format_map(factors)
+        self.engine.commit_settings()
+
+    def refresh(self) -> None:
+        self._rebuild_monitors()
 
     def _update_schedule_rows(self) -> None:
         n = self.engine.settings.night_light
