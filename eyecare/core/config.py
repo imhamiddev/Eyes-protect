@@ -118,6 +118,13 @@ class Hotkeys:
 
 
 @dataclass
+class Sound:
+    enabled: bool = True          # start/end chimes around breaks
+    volume: int = 50
+    reminder_sounds: bool = False  # also a soft ping for reminders and prompts
+
+
+@dataclass
 class Location:
     city: str = "tehran"
 
@@ -137,6 +144,7 @@ class Settings:
     location: Location = field(default_factory=Location)
     monitors: Monitors = field(default_factory=Monitors)
     hotkeys: Hotkeys = field(default_factory=Hotkeys)
+    sound: Sound = field(default_factory=Sound)
 
 
 def _merge(target: Any, data: dict) -> None:

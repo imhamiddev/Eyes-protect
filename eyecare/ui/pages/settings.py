@@ -11,7 +11,7 @@ from eyecare.core.i18n import tr
 from eyecare.updates import State
 
 from ..widgets import (
-    AnimatedButton, Dropdown, ProgressBar, Segmented, SettingRow, ShortcutEdit, Toggle,
+    AnimatedButton, Dropdown, LabeledSlider, ProgressBar, Segmented, SettingRow, ShortcutEdit, Toggle,
     secondary_button,
 )
 from .base import Page
@@ -51,6 +51,19 @@ class SettingsPage(Page):
             self.progress_box,
         )
 
+        self.section(tr("set.sound"))
+        self.sound_on = Toggle()
+        self.volume = LabeledSlider(0, 100, 50)
+        self.volume.slider.setMinimumWidth(170)
+        self.sound_reminders = Toggle()
+        self.sound_test = secondary_button(tr("set.sound_test"), "play")
+        self.card(
+            SettingRow(tr("set.sound"), tr("set.sound_desc"), self.sound_on),
+            SettingRow(tr("set.sound_volume"), "", self.volume),
+            SettingRow(tr("set.sound_reminders"), tr("set.sound_reminders_desc"), self.sound_reminders),
+            SettingRow(tr("set.sound_test"), "", self.sound_test),
+        )
+
         self.section(tr("set.hotkeys"))
         self.hk_on = Toggle()
         self.hk_edits: dict[str, ShortcutEdit] = {}
@@ -83,6 +96,10 @@ class SettingsPage(Page):
         self.animations.toggled.connect(self._save)
         self.auto_update.toggled.connect(self._save)
         self.hk_on.toggled.connect(self._save)
+        self.sound_on.toggled.connect(self._save)
+        self.sound_reminders.toggled.connect(self._save)
+        self.volume.valueChanged.connect(self._save)
+        self.sound_test.clicked.connect(lambda: self.engine.play_sound("start", force=True))
         self.update_btn.clicked.connect(self._on_update_clicked)
         engine.updates.changed.connect(self._refresh_update)
         self.load()
@@ -151,6 +168,10 @@ class SettingsPage(Page):
         self.autostart.setChecked(g.autostart)
         self.animations.setChecked(g.animations)
         self.auto_update.setChecked(g.auto_update)
+        snd = self.engine.settings.sound
+        self.sound_on.setChecked(snd.enabled)
+        self.volume.set_value(snd.volume)
+        self.sound_reminders.setChecked(snd.reminder_sounds)
         h = self.engine.settings.hotkeys
         self.hk_on.setChecked(h.enabled)
         for action, edit in self.hk_edits.items():
@@ -168,6 +189,9 @@ class SettingsPage(Page):
         g.autostart = self.autostart.isChecked()
         g.animations = self.animations.isChecked()
         g.auto_update = self.auto_update.isChecked()
+        snd = self.engine.settings.sound
+        snd.enabled, snd.volume = self.sound_on.isChecked(), self.volume.value()
+        snd.reminder_sounds = self.sound_reminders.isChecked()
         self.engine.settings.hotkeys.enabled = self.hk_on.isChecked()
         for edit in self.hk_edits.values():
             edit.setEnabled(self.hk_on.isChecked())

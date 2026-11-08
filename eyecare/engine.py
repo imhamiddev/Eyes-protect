@@ -11,6 +11,7 @@ from PySide6.QtCore import QEasingCurve, QObject, QTimer, QVariantAnimation, Sig
 from eyecare.core import winapi
 from eyecare.core.colortemp import build_ramp, channel_multipliers
 from eyecare.core.config import Settings, load_settings, save_settings
+from eyecare.core.sounds import SoundPlayer
 from eyecare.core.stats import Stats
 from eyecare.core import monitors as mon
 from eyecare.core.cities import city_by_key
@@ -51,6 +52,7 @@ class Engine(QObject):
         self._settings_path = settings_path
         self.settings = settings or load_settings(settings_path)
         self.stats = stats or Stats()
+        self.sounds = SoundPlayer(settings_path.parent / "sounds" if settings_path else None)
         self.paused = False
         self.hotkey_failures: set[str] = set()  # actions whose shortcut could not be registered
         self.quiet_until = 0.0           # epoch seconds; inf = until switched off
@@ -312,6 +314,13 @@ class Engine(QObject):
 
     def record_blink_shown(self) -> None:
         self.stats.add("blinks")
+
+    def play_sound(self, kind: str, reminder: bool = False, force: bool = False) -> bool:
+        """Play a chime if sounds are on (``reminder`` chimes also need the reminder switch)."""
+        cfg = self.settings.sound
+        if not force and (not cfg.enabled or (reminder and not cfg.reminder_sounds)):
+            return False
+        return self.sounds.play(kind, cfg.volume)
 
     def record_stretch(self) -> None:
         self.stats.add("stretches")
