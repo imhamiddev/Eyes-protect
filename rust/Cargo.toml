@@ -23,6 +23,8 @@ sha2 = "0.10"
 ureq = { version = "2", default-features = false, features = ["tls"] }
 url = "2"
 
+iced = { version = "0.13", default-features = false, features = ["tiny-skia", "multi-window", "canvas", "svg", "image", "smol"] }
+
 [dev-dependencies]
 tempfile = "3"
 
