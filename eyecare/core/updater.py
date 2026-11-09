@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Callable
 from urllib.parse import urlparse
 
+from .changelog import extract_bullets
+
 REPO = "imhamiddev/Eyes-protect"
 API_LATEST = f"https://api.github.com/repos/{REPO}/releases/latest"
 RELEASE_PAGE = f"https://github.com/{REPO}/releases/latest"
@@ -192,3 +194,8 @@ def launch_installer(installer: Path) -> None:
     flags = 0x08000000 | 0x00000008  # CREATE_NO_WINDOW | DETACHED_PROCESS
     subprocess.Popen(f"cmd /c {installer_command(installer)}", shell=True, creationflags=flags,
                      close_fds=True)
+
+
+def summarize_notes(notes: str, language: str = "en", limit: int = 6) -> list[str]:
+    """Short plain-text bullet list from a release body (markdown stripped)."""
+    return extract_bullets(notes, language, limit)

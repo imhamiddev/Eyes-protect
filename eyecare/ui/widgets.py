@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 
 from . import icons, tokens
 from .controls import AnimatedButton, IconButton, SmoothSlider, ValueLabel  # noqa: F401
+from . import motion
 from .motion import Tween, lerp_color as _lerp_color, qcolor, ms, with_alpha  # noqa: F401
 from .theme import current, theme
 
@@ -650,6 +651,68 @@ class BarChart(QWidget, _Themed):
                 p.setFont(f)
                 p.drawText(QRectF(i * slot, h - label_h + 4, slot, label_h),
                            Qt.AlignmentFlag.AlignHCenter, self.labels[i])
+
+
+class Collapsible(QWidget):
+    """Header button + body that slides open/closed."""
+
+    def __init__(self, title: str, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.header = AnimatedButton(title, "chevron-down", "ghost", align="start")
+        self.header.setCheckable(True)
+        self.body = QWidget()
+        self.body.setMaximumHeight(0)
+        self._lay = QVBoxLayout(self.body)
+        self._lay.setContentsMargins(16, 0, 8, 10)
+        self._lay.setSpacing(6)
+        self._anim = QVariantAnimation(self)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._anim.valueChanged.connect(lambda v: self.body.setMaximumHeight(int(v)))
+        self._anim.finished.connect(self._settled)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+        outer.addWidget(self.header, 0, Qt.AlignmentFlag.AlignLeading)
+        outer.addWidget(self.body)
+        self.header.toggled.connect(self._toggle)
+
+    def set_title(self, text: str) -> None:
+        self.header.setText(text)
+
+    def set_lines(self, lines: list[str]) -> None:
+        while self._lay.count():
+            item = self._lay.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        for line in lines:
+            lab = label("•  " + line, "Muted", wrap=True)
+            self._lay.addWidget(lab)
+        if self.header.isChecked():
+            self.body.setMaximumHeight(16777215)
+
+    def is_open(self) -> bool:
+        return self.header.isChecked()
+
+    def _target(self) -> int:
+        return self._lay.sizeHint().height() + 10
+
+    def _toggle(self, open_: bool) -> None:
+        self.header.icon_name = "chevron-up" if open_ else "chevron-down"
+        self.header.update()
+        start = self.body.maximumHeight() if self.body.maximumHeight() < 16777215 else self._target()
+        end = self._target() if open_ else 0
+        self._anim.stop()
+        if motion.ms(1) == 0:
+            self.body.setMaximumHeight(16777215 if open_ else 0)
+            return
+        self._anim.setDuration(260)
+        self._anim.setStartValue(start)
+        self._anim.setEndValue(end)
+        self._anim.start()
+
+    def _settled(self) -> None:
+        if self.header.isChecked():
+            self.body.setMaximumHeight(16777215)
 
 
 class ShortcutEdit(QKeySequenceEdit):

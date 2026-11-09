@@ -7,11 +7,13 @@ from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from eyecare import APP_NAME, __version__
 from eyecare.core import hotkeys as hk
+from eyecare.core import i18n
 from eyecare.core.i18n import tr
+from eyecare.core.updater import summarize_notes
 from eyecare.updates import State
 
 from ..widgets import (
-    AnimatedButton, Dropdown, LabeledSlider, ProgressBar, Segmented, SettingRow, ShortcutEdit, Toggle,
+    AnimatedButton, Collapsible, Dropdown, LabeledSlider, ProgressBar, Segmented, SettingRow, ShortcutEdit, Toggle,
     secondary_button,
 )
 from .base import Page
@@ -39,16 +41,20 @@ class SettingsPage(Page):
         self.auto_update = Toggle()
         self.update_btn = secondary_button(tr("upd.btn_check"), "refresh")
         self.update_row = SettingRow(tr("upd.version").replace("{v}", __version__), "", self.update_btn)
+        self._notes_shown: list[str] = []
         self.progress = ProgressBar()
         self.progress_box = QWidget()
         pl = QVBoxLayout(self.progress_box)
         pl.setContentsMargins(0, 0, 0, 14)
         pl.addWidget(self.progress)
         self.progress_box.setVisible(False)
+        self.whats_new = Collapsible("")
+        self.whats_new.setVisible(False)
         self.card(
             SettingRow(tr("set.auto_update"), tr("set.auto_update_desc"), self.auto_update),
             self.update_row,
             self.progress_box,
+            self.whats_new,
         )
 
         self.section(tr("set.sound"))
@@ -155,6 +161,12 @@ class SettingsPage(Page):
         btn.setEnabled(enabled)
         btn.updateGeometry()
         btn.update()
+        notes = summarize_notes(um.info.notes, i18n.language()) if um.info and st != State.ERROR else []
+        if notes != self._notes_shown:
+            self._notes_shown = notes
+            self.whats_new.set_lines(notes)
+        self.whats_new.set_title(tr("upd.whats_new").replace("{v}", v))
+        self.whats_new.setVisible(bool(notes))
         downloading = st == State.DOWNLOADING
         self.progress_box.setVisible(downloading or st == State.READY)
         self.progress.set_value(um.progress if downloading else (1.0 if st == State.READY else 0.0))

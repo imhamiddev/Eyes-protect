@@ -5,7 +5,7 @@ root = Path(SPECPATH)
 a = Analysis(
     [str(root / "eyecare" / "__main__.py")],
     pathex=[str(root)],
-    datas=[(str(root / "eyecare" / "assets"), "assets")],
+    datas=[(str(root / "eyecare" / "assets"), "assets"), (str(root / "CHANGELOG.md"), "assets")],
     excludes=["PySide6.QtWebEngineCore", "PySide6.QtQml", "PySide6.QtQuick", "tkinter"],
 )
 pyz = PYZ(a.pure)
