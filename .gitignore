@@ -10,3 +10,4 @@ dist/
 .vscode/
 *.egg-info/
 dist-installer/
+release-notes.md

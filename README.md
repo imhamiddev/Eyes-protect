@@ -4,12 +4,17 @@ A quiet Windows companion that protects your eyes. Runs in the tray, starts with
 
 ## Features
 - **20-20-20 rule** – timer, desktop toast, snooze, natural-break detection (idle time).
-- **Night light** – warmth slider, quick toggle, schedule by time.
+- **Smart pause** – stays quiet during full-screen apps, presentations, meetings and Focus assist.
+- **Quiet mode** – 30 min to 4 h (or "I'm in a meeting") from the tray, Home or a shortcut.
+- **Night light** – warmth slider, quick toggle, fixed times or the real sunset/sunrise of your city, gradual fades.
 - **Screen dimmer** – Day / Night / Reading profiles, separate night brightness, schedule.
-- **Blink reminder**, **Hydration reminder**.
-- **Eye exercises** – guided, auto-advancing routines.
+- **Multi-monitor** – filters on every display, with per-monitor on/off and brightness.
+- **Blink**, **hydration** and **stretch** reminders.
+- **Eye exercises** and **body stretches** – guided, auto-advancing routines.
+- **Stats** – screen time, longest stretch, day streak, daily goal, weekly report.
 - **Auto dark mode** – switches Windows between light and dark by time.
 - **Break Lock** – full-screen break on every monitor, skippable.
+- **Global shortcuts**, soft **chimes**, **automatic updates** with release notes.
 - English + Persian (RTL), dark + light theme, per the visual identity in the design brief.
 
 ## Run from source (Windows)
@@ -25,7 +30,8 @@ and run it. It installs per-user (no admin rights), adds a Start-menu entry (opt
 starts Eye Care with Windows and registers an uninstaller in *Apps & features*.
 
 ## Build the installer
-Push a tag like `v0.2.0` (or run the *Build Windows installer* workflow). Locally:
+Add the version's notes to `CHANGELOG.md` (English, then Persian after `<!-- fa -->`), bump the version in
+`eyecare/__init__.py` and `pyproject.toml`, then push a tag like `v0.4.0` (or run the *Build Windows installer* workflow). Locally:
 `pyinstaller eyecare.spec`, then compile `installer/eyecare.iss` with Inno Setup 6.
 
 ## Notes
