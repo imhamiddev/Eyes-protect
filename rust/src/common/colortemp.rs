@@ -61,9 +61,20 @@ pub fn build_ramp(multipliers: (f64, f64, f64)) -> Ramp {
     ramp
 }
 
+/// The no-op ramp (what Windows has when no colour correction is active).
+pub fn identity_ramp() -> Ramp {
+    build_ramp((1.0, 1.0, 1.0))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn identity_ramp_is_linear() {
+        let ramp = identity_ramp();
+        assert!(ramp.iter().all(|c| c[0] == 0 && c[255] == 65535 && c[128] == 128 * 257));
+    }
 
     #[test]
     fn neutral_is_identity() {
