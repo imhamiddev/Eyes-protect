@@ -9,3 +9,4 @@ pub mod cities;
 pub mod exercises;
 pub mod config;
 pub mod stats;
+pub mod changelog;
