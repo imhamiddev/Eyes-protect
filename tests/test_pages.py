@@ -354,3 +354,16 @@ def test_settings_shortcut_toggle_and_in_use_message(engine):
     assert p.hk_rows["quiet"].desc.text() == i18n.tr("hk.in_use")
     p.hk_on.setChecked(False)
     assert engine.settings.hotkeys.enabled is False and not p.hk_edits["pause"].isEnabled()
+
+
+def test_settings_sound_controls(engine, monkeypatch):
+    p = SettingsPage(engine)
+    p.volume.slider.setValue(30)
+    p.sound_reminders.setChecked(True)
+    p.sound_on.setChecked(False)
+    s = engine.settings.sound
+    assert s.volume == 30 and s.reminder_sounds is True and s.enabled is False
+    played = []
+    monkeypatch.setattr(engine.sounds, "play", lambda kind, vol: played.append((kind, vol)) or True)
+    p.sound_test.click()                  # the sample plays even when chimes are switched off
+    assert played == [("start", 30)]

@@ -137,6 +137,7 @@ class EyeCareApp:
         if not self.engine.settings.rule202020.enabled:
             self.engine.snooze()
             return
+        self.engine.play_sound("notify", reminder=True)
         self._prompt_toast = self.toasts.show(
             "eye", i18n.tr("toast.rule_title"), i18n.tr("toast.rule_body"),
             [(i18n.tr("toast.start"), self.engine.start_break, True),
@@ -150,6 +151,7 @@ class EyeCareApp:
 
     def on_break_started(self, seconds: int) -> None:
         s = self.engine.settings
+        self.engine.play_sound("start")
         if self._prompt_toast is not None:
             self._prompt_toast.dismiss()
             self._prompt_toast = None
@@ -177,14 +179,17 @@ class EyeCareApp:
             self._mini_toast.dismiss()
             self._mini_toast = None
         if completed:
+            self.engine.play_sound("end")
             self.toasts.show("check", i18n.tr("break.done"), "", [], timeout_ms=3000)
 
     def on_blink(self) -> None:
         self.engine.record_blink_shown()
+        self.engine.play_sound("notify", reminder=True)
         self.toasts.show("eye", i18n.tr("toast.blink_title"), i18n.tr("toast.blink_body"),
                          [], timeout_ms=BLINK_TOAST_MS)
 
     def on_posture(self) -> None:
+        self.engine.play_sound("notify", reminder=True)
         self.toasts.show(
             "person", i18n.tr("toast.posture_title"), i18n.tr("toast.posture_body"),
             [(i18n.tr("toast.posture_start"), self.start_stretch, True),
@@ -199,6 +204,7 @@ class EyeCareApp:
         return self._stretch
 
     def on_water(self) -> None:
+        self.engine.play_sound("notify", reminder=True)
         self.toasts.show("droplet", i18n.tr("toast.water_title"), i18n.tr("toast.water_body"),
                          [(i18n.tr("toast.drank"), self.engine.record_water, True)],
                          timeout_ms=WATER_TOAST_MS)

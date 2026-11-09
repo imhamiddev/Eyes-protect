@@ -261,3 +261,16 @@ def register_hotkey(hotkey_id: int, modifiers: int, vk: int) -> bool:
 def unregister_hotkey(hotkey_id: int) -> None:
     if IS_WINDOWS:
         _user32.UnregisterHotKey(None, hotkey_id)
+
+
+def play_sound_file(path) -> bool:
+    """Play a WAV asynchronously (returns immediately). No-op off Windows."""
+    if not IS_WINDOWS:
+        return False
+    import winsound
+
+    try:
+        winsound.PlaySound(str(path), winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
+        return True
+    except RuntimeError:
+        return False
