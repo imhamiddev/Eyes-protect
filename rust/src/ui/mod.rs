@@ -2,3 +2,4 @@
 
 pub mod icon_data;
 pub mod theme;
+pub mod widgets;
