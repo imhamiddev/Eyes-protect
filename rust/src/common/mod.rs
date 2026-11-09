@@ -4,3 +4,4 @@ pub mod timeutil;
 pub mod countdown;
 pub mod colortemp;
 pub mod sun;
+pub mod monitors;
