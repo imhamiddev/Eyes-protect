@@ -11,3 +11,9 @@ dist/
 *.egg-info/
 dist-installer/
 release-notes.md
+
+# Rust
+rust/target/
+
+# Rust
+rust/target/
