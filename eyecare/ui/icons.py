@@ -25,6 +25,7 @@ _P = {
     "coffee": '<path d="M10 2v2"/><path d="M14 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1z"/><path d="M6 2v2"/><path d="M17 12h2a2 2 0 0 1 0 4h-2"/>',
     "clock": '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
     "chevron-down": '<path d="m6 9 6 6 6-6"/>',
+    "chevron-up": '<path d="m18 15-6-6-6 6"/>',
     "plus": '<path d="M5 12h14"/><path d="M12 5v14"/>',
     "minus": '<path d="M5 12h14"/>',
     "skip": '<polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/>',

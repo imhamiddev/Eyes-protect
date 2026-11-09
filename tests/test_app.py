@@ -197,3 +197,27 @@ def test_reminder_pings_need_their_own_switch(ea, monkeypatch):
     ea.on_water()
     ea.on_posture()
     assert [k for k, _ in played] == ["notify"] * 3
+
+
+def test_update_toast_includes_release_notes(ea):
+    from eyecare.core import updater
+
+    info = updater.ReleaseInfo("9.9.9", "v9.9.9", "- One\n- Two\n- Three\n- Four", "https://github.com/x",
+                               3, None, "p")
+    ea.on_update_ready(info)
+    toast = ea.toasts._toasts[0]
+    assert "• One" in toast.body_label.text() and "• Three" in toast.body_label.text()
+    assert "Four" not in toast.body_label.text()
+
+
+def test_post_update_notice_only_after_a_real_update(ea):
+    import eyecare
+    from eyecare.core.config import Settings
+
+    g = ea.engine.settings.general
+    g.last_seen_version = ""
+    assert ea.check_post_update() is False and g.last_seen_version == eyecare.__version__   # fresh install
+    assert ea.check_post_update() is False                                                    # same version
+    g.last_seen_version = "0.0.1"
+    assert ea.check_post_update() is True
+    assert ea.toasts.count() >= 1 and g.last_seen_version == eyecare.__version__

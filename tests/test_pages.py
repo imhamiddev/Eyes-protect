@@ -367,3 +367,33 @@ def test_settings_sound_controls(engine, monkeypatch):
     monkeypatch.setattr(engine.sounds, "play", lambda kind, vol: played.append((kind, vol)) or True)
     p.sound_test.click()                  # the sample plays even when chimes are switched off
     assert played == [("start", 30)]
+
+
+def test_settings_shows_whats_new_for_an_available_update(engine, app):
+    from eyecare.core import updater
+    from eyecare.updates import State
+
+    um = engine.updates
+    um._can_install = lambda: True
+    um.info = updater.ReleaseInfo("9.9.9", "v9.9.9", "- Faster start\n- **Bold** fix\n<!-- fa -->\n- شروع سریع‌تر",
+                                  "https://github.com/x", 3, None, "p")
+    um._set(State.AVAILABLE)
+    p = SettingsPage(engine)
+    assert not p.whats_new.isHidden() and "9.9.9" in p.whats_new.header.text()
+    texts = [lab.text() for lab in p.whats_new.body.findChildren(__import__("PySide6.QtWidgets", fromlist=["QLabel"]).QLabel)]
+    assert texts == ["•  Faster start", "•  Bold fix"]
+    i18n.set_language("fa")
+    p2 = SettingsPage(engine)
+    texts = [lab.text() for lab in p2.whats_new.body.findChildren(__import__("PySide6.QtWidgets", fromlist=["QLabel"]).QLabel)]
+    assert texts == ["•  شروع سریع‌تر"]
+    i18n.set_language("en")
+
+
+def test_settings_hides_whats_new_without_notes(engine):
+    from eyecare.core import updater
+    from eyecare.updates import State
+
+    um = engine.updates
+    um.info = updater.ReleaseInfo("9.9.9", "v9.9.9", "", "https://github.com/x", 3, None, "p")
+    um._set(State.AVAILABLE)
+    assert SettingsPage(engine).whats_new.isHidden()

@@ -10,7 +10,10 @@ from PySide6.QtWidgets import QApplication
 from eyecare import APP_NAME
 from eyecare.core import i18n, winapi
 from eyecare.core.config import config_dir
+from eyecare import __version__
 from eyecare.core import hotkeys as hk
+from eyecare.core.changelog import notes_for
+from eyecare.core.updater import summarize_notes
 from eyecare.engine import Engine
 from eyecare.hotkeys import HotkeyManager
 from eyecare.features.rule202020 import Phase
@@ -113,6 +116,20 @@ class EyeCareApp:
         self.window.raise_()
         self.window.activateWindow()
 
+    def check_post_update(self) -> bool:
+        """After an update, show what changed once (never on a fresh install)."""
+        g = self.engine.settings.general
+        previous, g.last_seen_version = g.last_seen_version, __version__
+        if previous == __version__:
+            return False
+        self.engine.save_quietly()
+        if not previous:
+            return False
+        notes = notes_for(__version__, i18n.language(), limit=4)
+        self.toasts.show("sparkles", i18n.tr("upd.updated_title").replace("{v}", __version__),
+                         "\n".join("• " + n for n in notes), [], timeout_ms=15_000)
+        return True
+
     def start(self, background: bool) -> None:
         self.sync_hotkeys()
         self.engine.start()
@@ -120,6 +137,7 @@ class EyeCareApp:
             self.tray.show()
         if not background:
             self.show_window()
+        QTimer.singleShot(4000, self.check_post_update)
 
     def quit(self) -> None:
         if self.window:
@@ -210,9 +228,12 @@ class EyeCareApp:
                          timeout_ms=WATER_TOAST_MS)
 
     def on_update_ready(self, info) -> None:
+        body = i18n.tr("upd.toast_body").replace("{v}", info.version)
+        notes = summarize_notes(info.notes, i18n.language(), limit=3)
+        if notes:
+            body += "\n" + "\n".join("• " + n for n in notes)
         self.toasts.show(
-            "download", i18n.tr("upd.toast_title"),
-            i18n.tr("upd.toast_body").replace("{v}", info.version),
+            "download", i18n.tr("upd.toast_title"), body,
             [(i18n.tr("upd.toast_install"), self.engine.updates.install, True),
              (i18n.tr("upd.toast_later"), lambda: None, False)])
 

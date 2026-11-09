@@ -30,8 +30,12 @@ jobs:
         with:
           name: EyeCare-Setup
           path: dist-installer/EyeCare-Setup.exe
+      - name: Write release notes from CHANGELOG.md
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: python tools/release_notes.py ${{ steps.ver.outputs.version }} release-notes.md
       - name: Attach to release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: dist-installer/EyeCare-Setup.exe
+          body_path: release-notes.md

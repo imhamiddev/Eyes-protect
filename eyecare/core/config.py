@@ -26,6 +26,7 @@ class General:
     auto_update: bool = True
     last_update_check: float = 0.0
     daily_break_goal: int = 6
+    last_seen_version: str = ""
 
 
 @dataclass

@@ -92,3 +92,35 @@ def test_setting_row_description_visibility(app):
     row.set_texts("T", "D")
     assert not row.desc.isHidden() or True
     assert row.desc.text() == "D"
+
+
+def test_collapsible_opens_closes_and_lists_lines(app):
+    from eyecare.ui import motion
+
+    motion.set_enabled(False)
+    try:
+        c = w.Collapsible("What's new")
+        c.set_lines(["one", "two"])
+        c.resize(400, 200)
+        c.show()
+        assert not c.is_open() and c.body.maximumHeight() == 0
+        c.header.setChecked(True)
+        assert c.is_open() and c.body.maximumHeight() > 0 and c.header.icon_name == "chevron-up"
+        c.set_lines(["a", "b", "c"])
+        assert c.body.maximumHeight() > 0
+        c.header.setChecked(False)
+        assert c.body.maximumHeight() == 0 and c.header.icon_name == "chevron-down"
+    finally:
+        motion.set_enabled(True)
+
+
+def test_collapsible_animates_height_when_motion_on(app):
+    from eyecare.ui import motion
+
+    motion.set_enabled(True)
+    c = w.Collapsible("x")
+    c.set_lines(["one", "two", "three"])
+    c.show()
+    c.header.setChecked(True)
+    assert c._anim.state() == c._anim.State.Running
+    c._anim.stop()
