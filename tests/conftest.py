@@ -39,6 +39,10 @@ def _hermetic_winapi(monkeypatch):
     monkeypatch.setattr(winapi, "set_monitor_gamma_ramp", lambda device, ramp: False)
     monkeypatch.setattr(winapi, "list_monitors", lambda: [winapi.Monitor("DISPLAY1", 1920, 1080, True)])
     monkeypatch.setattr(winapi, "play_sound_file", lambda path: False)
+    monkeypatch.setattr(winapi, "notification_state", lambda: 5)   # normal desktop, nothing busy
+    monkeypatch.setattr(winapi, "foreground_info", lambda: None)
+    monkeypatch.setattr(winapi, "register_hotkey", lambda i, mods, vk: True)
+    monkeypatch.setattr(winapi, "unregister_hotkey", lambda i: None)
     monkeypatch.setattr(winapi, "set_autostart", lambda *a, **k: False)
     monkeypatch.setattr(winapi, "set_system_light_theme", lambda light: False)
     monkeypatch.setattr(winapi, "system_uses_light_theme", lambda: False)
