@@ -2,3 +2,4 @@
 pub mod interval;
 pub mod smartpause;
 pub mod rule202020;
+pub mod display;
