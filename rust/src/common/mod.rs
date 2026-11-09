@@ -7,3 +7,4 @@ pub mod sun;
 pub mod monitors;
 pub mod cities;
 pub mod exercises;
+pub mod config;
