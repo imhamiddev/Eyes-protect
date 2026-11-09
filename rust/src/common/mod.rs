@@ -8,3 +8,4 @@ pub mod monitors;
 pub mod cities;
 pub mod exercises;
 pub mod config;
+pub mod stats;
