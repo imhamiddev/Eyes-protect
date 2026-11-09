@@ -13,3 +13,5 @@ pub mod changelog;
 pub mod hotkeys;
 pub mod sounds;
 pub mod updater;
+mod i18n_strings;
+pub mod i18n;
