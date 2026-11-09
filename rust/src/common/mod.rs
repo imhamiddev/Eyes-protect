@@ -5,3 +5,4 @@ pub mod countdown;
 pub mod colortemp;
 pub mod sun;
 pub mod monitors;
+pub mod cities;
