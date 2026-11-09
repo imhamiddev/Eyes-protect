@@ -155,3 +155,45 @@ def test_changed_hotkey_settings_reregister(ea, monkeypatch):
     n = len(calls)
     ea.engine.commit_settings()          # nothing changed -> no re-registration
     assert len(calls) == n
+
+
+def _sound_log(ea, monkeypatch):
+    played = []
+    monkeypatch.setattr(ea.engine.sounds, "play", lambda kind, vol: played.append((kind, vol)) or True)
+    return played
+
+
+def test_break_chimes_play_at_start_and_end(ea, monkeypatch):
+    played = _sound_log(ea, monkeypatch)
+    ea.engine.settings.sound.volume = 40
+    ea.engine.start_break()
+    for _ in range(ea.engine.settings.rule202020.break_seconds):
+        ea.engine.on_tick()
+    assert played == [("start", 40), ("end", 40)]
+
+
+def test_skipped_break_has_no_end_chime(ea, monkeypatch):
+    played = _sound_log(ea, monkeypatch)
+    ea.engine.start_break()
+    ea.engine.skip_break()
+    assert [k for k, _ in played] == ["start"]
+
+
+def test_sounds_can_be_switched_off(ea, monkeypatch):
+    played = _sound_log(ea, monkeypatch)
+    ea.engine.settings.sound.enabled = False
+    ea.engine.start_break()
+    assert played == []
+
+
+def test_reminder_pings_need_their_own_switch(ea, monkeypatch):
+    played = _sound_log(ea, monkeypatch)
+    ea.on_blink()
+    ea.on_water()
+    ea.on_posture()
+    assert played == []
+    ea.engine.settings.sound.reminder_sounds = True
+    ea.on_blink()
+    ea.on_water()
+    ea.on_posture()
+    assert [k for k, _ in played] == ["notify"] * 3
