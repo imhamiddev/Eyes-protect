@@ -11,3 +11,4 @@ pub mod config;
 pub mod stats;
 pub mod changelog;
 pub mod hotkeys;
+pub mod sounds;
