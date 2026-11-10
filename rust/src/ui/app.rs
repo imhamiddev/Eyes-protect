@@ -67,6 +67,8 @@ pub enum Message {
     ToggleQuiet,
     ToggleNight(bool),
     Set(Setting),
+    /// Text typed into an `HH:MM` box.
+    TimeDraft(actions::StrKey, String),
     Quit,
 }
 
@@ -75,6 +77,8 @@ pub struct App {
     pub page: Page,
     pub main_window: Option<window::Id>,
     pub system_dark: bool,
+    /// Half-typed time fields (invalid text stays here until it parses).
+    pub drafts: std::collections::HashMap<String, String>,
 }
 
 const FONTS: [&[u8]; 6] = [
@@ -93,7 +97,7 @@ fn main_window_settings() -> window::Settings {
 
 impl App {
     pub fn new(engine: Engine, background: bool) -> (Self, Task<Message>) {
-        let mut app = App { engine, page: Page::Home, main_window: None, system_dark: true };
+        let mut app = App { engine, page: Page::Home, main_window: None, system_dark: true, drafts: Default::default() };
         app.engine.start();
         i18n::set_language(&app.engine.settings.general.language);
         let task = if background { Task::none() } else { app.open_main() };
@@ -160,6 +164,17 @@ impl App {
                 let _ = actions::apply(&mut self.engine, &change);
                 i18n::set_language(&self.engine.settings.general.language);
             }
+            Message::TimeDraft(key, text) => {
+                let id = format!("{key:?}");
+                match actions::apply(&mut self.engine, &Setting::Str(key, text.clone())) {
+                    Ok(()) => {
+                        self.drafts.remove(&id);
+                    }
+                    Err(_) => {
+                        self.drafts.insert(id, text);
+                    }
+                }
+            }
             Message::Quit => {
                 self.engine.shutdown();
                 return iced::exit();
@@ -189,6 +204,9 @@ impl App {
         let p = ctx.p;
         let body: Element<'_, Message> = match self.page {
             Page::Home => pages::home::view(ctx, &self.engine),
+            Page::Stats => pages::stats::view(ctx, &self.engine),
+            Page::Care => pages::care::view(ctx, &self.engine),
+            Page::Display => pages::display::view(ctx, &self.engine, &self.drafts),
             _ => label::<Message>(ctx, ctx.t(self.page.nav_key()), Txt::H2).into(),
         };
         let heading: Element<'_, Message> = column![

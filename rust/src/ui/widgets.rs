@@ -226,7 +226,7 @@ pub fn stepper<'a, M: Clone + 'a>(ctx: Ctx, value: i64, min: i64, max: i64, step
     };
     let dec = (value - step).max(min);
     let inc = (value + step).min(max);
-    let value_box = container(label::<M>(ctx, value.to_string(), Txt::Body)).width(56).center_x(Length::Fill).center_y(theme::CONTROL_H).style(move |_| theme::card_flat(p));
+    let value_box = container(label::<M>(ctx, value.to_string(), Txt::Body)).width(56).center_x(56).center_y(theme::CONTROL_H).style(move |_| theme::card_flat(p));
     row![
         small("minus", dec, value > min, msg(dec)),
         value_box,
