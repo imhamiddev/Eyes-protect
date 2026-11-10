@@ -79,6 +79,20 @@ impl Platform for NullPlatform {
     }
 }
 
+/// Open a web page in the default browser (http/https only).
+pub fn open_url(url: &str) -> bool {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return false;
+    }
+    #[cfg(windows)]
+    let result = std::process::Command::new("rundll32").args(["url.dll,FileProtocolHandler", url]).spawn();
+    #[cfg(target_os = "macos")]
+    let result = std::process::Command::new("open").arg(url).spawn();
+    #[cfg(all(not(windows), not(target_os = "macos")))]
+    let result = std::process::Command::new("xdg-open").arg(url).spawn();
+    result.is_ok()
+}
+
 /// The platform implementation for the OS we are running on.
 pub fn system() -> std::sync::Arc<dyn Platform> {
     #[cfg(windows)]
@@ -94,6 +108,13 @@ pub fn system() -> std::sync::Arc<dyn Platform> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn open_url_refuses_anything_but_web_links() {
+        assert!(!open_url("file:///etc/passwd"));
+        assert!(!open_url("calc.exe"));
+        assert!(!open_url("javascript:alert(1)"));
+    }
 
     #[test]
     fn null_platform_is_inert() {

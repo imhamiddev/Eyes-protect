@@ -11,6 +11,14 @@ use iced::{Background, Border, Color, Element, Font, Length, Padding, Renderer, 
 use super::icon_data::ICONS;
 use super::theme::{self, Btn, Palette};
 
+/// `column!` whose children are right-aligned for RTL languages.
+macro_rules! rcol {
+    ($ctx:expr; $($x:expr),+ $(,)?) => {
+        iced::widget::column![$($x),+].align_x(if $ctx.fa { iced::alignment::Horizontal::Right } else { iced::alignment::Horizontal::Left })
+    };
+}
+pub(crate) use rcol;
+
 /// Per-frame rendering context: palette + language direction.
 #[derive(Debug, Clone, Copy)]
 pub struct Ctx {
@@ -28,12 +36,41 @@ impl Ctx {
         crate::common::i18n::tr_in(self.lang(), key)
     }
 
+    /// Like [`Ctx::font`], but text containing Arabic-script characters always uses Vazirmatn
+    /// (e.g. the "فارسی" language button while the UI is in English).
+    pub fn font_for(&self, content: &str, weight: Weight) -> Font {
+        let arabic = content.chars().any(|c| ('\u{0600}'..='\u{06FF}').contains(&c));
+        Ctx { fa: self.fa || arabic, ..*self }.font(weight)
+    }
+
     pub fn font(&self, weight: Weight) -> Font {
         Font { family: Family::Name(if self.fa { "Vazirmatn" } else { "Inter" }), weight, ..Font::DEFAULT }
     }
 }
 
 // -- text ---------------------------------------------------------------------------------
+/// True if `content` contains Arabic-script characters (Persian).
+pub fn is_rtl_text(content: &str) -> bool {
+    content.chars().any(|c| ('\u{0600}'..='\u{06FF}').contains(&c))
+}
+
+/// Rough rendered width of `content` at `size` px, used where a widget must shrink to its text.
+/// (iced 0.13 draws right-to-left text outside the bounds of a shrink-wrapped widget, so such
+/// widgets get an explicit, slightly generous width and centre the text inside it.)
+pub fn estimate_width(content: &str, size: f32) -> f32 {
+    content.chars().count() as f32 * size * 0.46 + 4.0
+}
+
+/// A text widget with the right font/shaping and, for Persian, a width that renders correctly.
+pub fn shrink_text<'a>(ctx: Ctx, content: &str, size: f32, weight: Weight) -> iced::widget::Text<'a, Theme, Renderer> {
+    let t = text(content.to_string()).size(size).font(ctx.font_for(content, weight)).shaping(text::Shaping::Advanced);
+    if is_rtl_text(content) {
+        t.width(estimate_width(content, size))
+    } else {
+        t
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Txt {
     H1,
@@ -58,7 +95,20 @@ pub fn label<'a, M: 'a>(ctx: Ctx, content: impl text::IntoFragment<'a>, kind: Tx
         Txt::Accent => (theme::F_BODY, p.accent, Weight::Normal),
         Txt::Display => (theme::F_DISPLAY, p.text, Weight::Semibold),
     };
-    text(content).size(size).color(color).font(ctx.font(weight))
+    let content = content.into_fragment();
+    let content_copy = content.to_string();
+    let font = ctx.font_for(&content, weight);
+    let rtl = is_rtl_text(&content);
+    let t = text(content).size(size).color(color).font(font).shaping(text::Shaping::Advanced);
+    if rtl { t.width(estimate_width(&content_copy, size)) } else { t }
+}
+
+/// Like [`label`], centred (for use inside a centred container).
+pub fn label_center<'a, M: 'a>(ctx: Ctx, content: impl text::IntoFragment<'a>, kind: Txt) -> iced::widget::Text<'a, Theme, Renderer> {
+    let content = content.into_fragment();
+    let rtl = is_rtl_text(&content);
+    let t = label::<M>(ctx, content, kind);
+    if rtl { t } else { t.width(Length::Fill).align_x(Horizontal::Center) }
 }
 
 // -- icons --------------------------------------------------------------------------------
@@ -125,12 +175,12 @@ pub fn card_rows<'a, M: 'a>(ctx: Ctx, rows: Vec<Element<'a, M>>) -> Element<'a, 
 }
 
 pub fn section<'a, M: 'a>(ctx: Ctx, title: &str) -> Element<'a, M> {
-    column![Space::new(0.0, 6.0), label::<M>(ctx, title.to_string(), Txt::Caption)].into()
+    rcol![ctx; Space::new(0.0, 6.0), label::<M>(ctx, title.to_string(), Txt::Caption)].into()
 }
 
 /// Label (+ optional description) on one side, a control on the other.
 pub fn setting_row<'a, M: Clone + 'a>(ctx: Ctx, title: &str, desc: &str, control: Element<'a, M>) -> Element<'a, M> {
-    let mut text_col = column![label::<M>(ctx, title.to_string(), Txt::Body)].spacing(3);
+    let mut text_col = rcol![ctx; label::<M>(ctx, title.to_string(), Txt::Body)].spacing(3);
     if !desc.is_empty() {
         text_col = text_col.push(label::<M>(ctx, desc.to_string(), Txt::Caption));
     }
@@ -189,7 +239,7 @@ pub fn action_button<'a, M: Clone + 'a>(ctx: Ctx, icon_name: Option<&str>, text_
     if let Some(name) = icon_name {
         items.push(icon(name, 18.0, fg));
     }
-    items.push(text(text_.to_string()).size(theme::F_BODY).font(ctx.font(weight)).wrapping(text::Wrapping::None).into());
+    items.push(shrink_text(ctx, text_, theme::F_BODY, weight).wrapping(text::Wrapping::None).into());
     let content = h_row(ctx, items).spacing(8).align_y(Vertical::Center);
     styled_button(ctx, container(content).center_y(Length::Fill), kind, Some(msg))
 }
@@ -243,7 +293,7 @@ pub fn segmented<'a, M: Clone + 'a>(ctx: Ctx, options: &[(&str, String)], active
     let mut items: Vec<Element<'a, M>> = Vec::new();
     for (key, caption) in options {
         let on = *key == active;
-        let b = button(container(text(caption.clone()).size(theme::F_BODY).font(ctx.font(Weight::Medium))).center_y(Length::Fill))
+        let b = button(container(shrink_text(ctx, caption, theme::F_BODY, Weight::Medium)).center_y(Length::Fill))
             .padding(Padding::from([0.0, 14.0]))
             .height(theme::CONTROL_H - 6.0)
             .style(move |_, st| {
@@ -265,7 +315,7 @@ pub fn segmented<'a, M: Clone + 'a>(ctx: Ctx, options: &[(&str, String)], active
 pub fn stat_card<'a, M: 'a>(ctx: Ctx, icon_name: &str, caption: &str, value: String) -> Element<'a, M> {
     let p = ctx.p;
     let head = h_row(ctx, vec![icon(icon_name, 18.0, p.accent), label::<M>(ctx, caption.to_string(), Txt::Muted).into()]).spacing(8).align_y(Vertical::Center);
-    card_padded(ctx, Padding::from([18.0, 22.0]), column![head, label::<M>(ctx, value, Txt::H1)].spacing(10))
+    card_padded(ctx, Padding::from([18.0, 22.0]), rcol![ctx; head, label::<M>(ctx, value, Txt::H1)].spacing(10))
 }
 
 // -- ring ---------------------------------------------------------------------------------------
@@ -326,8 +376,8 @@ pub fn bar_chart<'a, M: 'a>(ctx: Ctx, values: Vec<i64>, labels: Vec<String>, hei
         let track = container(bar).width(26).height(chart_h).align_y(Vertical::Bottom).style(move |_| theme::card_flat(p));
         let value_txt: Element<'a, M> = if *v > 0 { label::<M>(ctx, v.to_string(), Txt::Caption).into() } else { Space::new(0.0, 14.0).into() };
         let name = labels.get(i).cloned().unwrap_or_default();
-        let name_txt = text(name).size(11).font(ctx.font(Weight::Medium)).color(if i == last { p.text } else { p.text_faint });
-        cols.push(container(column![value_txt, track, name_txt].spacing(4).align_x(Horizontal::Center)).width(Length::Fill).center_x(Length::Fill).into());
+        let name_txt = shrink_text(ctx, &name, 11.0, Weight::Medium).color(if i == last { p.text } else { p.text_faint });
+        cols.push(container(rcol![ctx; value_txt, track, name_txt].spacing(4).align_x(Horizontal::Center)).width(Length::Fill).center_x(Length::Fill).into());
     }
     h_row(ctx, cols).width(Length::Fill).height(height).into()
 }

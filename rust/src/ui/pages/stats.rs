@@ -1,6 +1,6 @@
 //! Stats: streak, today's numbers, the last 7 days and weekly totals.
 
-use iced::widget::column;
+
 use iced::{Element, Length};
 
 use crate::common::i18n::tr_fmt_in;
@@ -34,10 +34,10 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine) -> Element<'a, Message> {
     let chart = card_padded(
         ctx,
         [18.0, 22.0],
-        column![label::<Message>(ctx, ctx.t("stats.trend"), Txt::Title), bar_chart(ctx, s.last_days("breaks", 7, None), weekday_labels(ctx, 7), 170.0)].spacing(10),
+        rcol![ctx; label::<Message>(ctx, ctx.t("stats.trend"), Txt::Title), bar_chart(ctx, s.last_days("breaks", 7, None), weekday_labels(ctx, 7), 170.0)].spacing(10),
     );
 
-    let mut lines = column![label::<Message>(ctx, ctx.t("stats.week"), Txt::Title)].spacing(8);
+    let mut lines = rcol![ctx; label::<Message>(ctx, ctx.t("stats.week"), Txt::Title)].spacing(8);
     if week.breaks == 0 && week.active_s == 0 {
         lines = lines.push(label::<Message>(ctx, ctx.t("stats.no_data"), Txt::Muted));
     } else {
@@ -58,5 +58,5 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine) -> Element<'a, Message> {
     }
     let goal_row = setting_row(ctx, &ctx.t("stats.goal"), &ctx.t("stats.goal_desc"), stepper(ctx, goal, 1, 50, 1, |v| Message::Set(Setting::Int(IntKey::DailyGoal, v))));
     let _ = today();
-    column![tiles, chart, card_padded(ctx, [18.0, 22.0], lines), card(ctx, goal_row)].spacing(16).into()
+    rcol![ctx; tiles, chart, card_padded(ctx, [18.0, 22.0], lines), card(ctx, goal_row)].spacing(16).into()
 }

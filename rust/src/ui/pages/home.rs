@@ -2,7 +2,7 @@
 
 use chrono::{Datelike, Duration, Local, TimeZone};
 use iced::alignment::Vertical;
-use iced::widget::{column, container};
+use iced::widget::container;
 use iced::{Element, Length};
 
 use crate::common::stats::today;
@@ -59,10 +59,10 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine) -> Element<'a, Message> {
     let hero = card_padded(
         ctx,
         28,
-        column![
+        rcol![ctx; 
             label::<Message>(ctx, ctx.t("home.next_break"), Txt::Caption),
             container(ring(ctx, 230.0, progress, ring_text)).center_x(Length::Fill),
-            container(label::<Message>(ctx, status_text(ctx, e), Txt::Muted)).center_x(Length::Fill),
+            label_center::<Message>(ctx, status_text(ctx, e), Txt::Muted),
             h_row(
                 ctx,
                 vec![
@@ -77,7 +77,7 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine) -> Element<'a, Message> {
     );
 
     let s = &e.stats;
-    let tiles = column![
+    let tiles = rcol![ctx; 
         h_row(
             ctx,
             vec![
@@ -92,13 +92,13 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine) -> Element<'a, Message> {
     let chart = card_padded(
         ctx,
         [18.0, 22.0],
-        column![
+        rcol![ctx; 
             label::<Message>(ctx, ctx.t("home.week"), Txt::Title),
             bar_chart(ctx, s.last_days("breaks", 7, None), weekday_labels(ctx, 7), 150.0),
         ]
         .spacing(10),
     );
-    let right = column![tiles, chart].spacing(16).width(Length::FillPortion(6));
+    let right = rcol![ctx; tiles, chart].spacing(16).width(Length::FillPortion(6));
     let left = container(hero).width(Length::FillPortion(5));
     h_row(ctx, vec![left.into(), right.into()]).spacing(20).align_y(Vertical::Top).into()
 }

@@ -1,6 +1,6 @@
 //! Care: 20-20-20 rule, smart pause and the blink / hydration / stretch reminders.
 
-use iced::widget::column;
+
 use iced::Element;
 
 use crate::engine::Engine;
@@ -53,5 +53,5 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine) -> Element<'a, Message> {
         other.push(setting_row(ctx, &t("care.interval"), "", num(ctx, s.posture.interval_min, 10, 180, 5, IntKey::PostureInt)));
     }
 
-    column![card_rows(ctx, rule_rows), card_rows(ctx, smart_rows), card_rows(ctx, other)].spacing(16).into()
+    rcol![ctx; card_rows(ctx, rule_rows), card_rows(ctx, smart_rows), card_rows(ctx, other)].spacing(16).into()
 }

@@ -1,6 +1,6 @@
 //! Display: night light, dimmer, per-monitor control and auto dark mode.
 
-use iced::widget::{column, pick_list, text_input};
+use iced::widget::{pick_list, text_input};
 use iced::Element;
 
 use crate::common::cities::{city_by_key, city_name, CITIES};
@@ -133,5 +133,5 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine, drafts: &'a std::collections::HashMap<S
         auto.push(setting_row(ctx, &t("display.dark_from"), "", time_field(ctx, StrKey::AdDark, &ad.dark_from, drafts)));
     }
     let _ = Btn::Primary;
-    column![card_rows(ctx, night), card_rows(ctx, dim), card_rows(ctx, monitors), card_rows(ctx, auto)].spacing(16).into()
+    rcol![ctx; card_rows(ctx, night), card_rows(ctx, dim), card_rows(ctx, monitors), card_rows(ctx, auto)].spacing(16).into()
 }

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use iced::alignment::Vertical;
-use iced::widget::{button, column, container, image, scrollable, Space};
+use iced::widget::{button, container, image, scrollable, Space};
 use iced::{window, Element, Length, Size, Subscription, Task, Theme};
 
 use crate::common::i18n;
@@ -13,6 +13,8 @@ use crate::platform;
 
 use super::actions::{self, Setting};
 use super::pages;
+use super::pages::exercises::Run;
+use crate::updates::{auto_check_due, GithubBackend, UpdateManager};
 use super::theme::{self, Btn, Palette};
 use super::widgets::*;
 
@@ -69,6 +71,15 @@ pub enum Message {
     Set(Setting),
     /// Text typed into an `HH:MM` box.
     TimeDraft(actions::StrKey, String),
+    StartExercise(&'static str),
+    NextExerciseStep,
+    StopExercise,
+    CheckUpdates,
+    DownloadUpdate,
+    InstallUpdate,
+    OpenReleasePage,
+    PlaySample,
+    OpenAuthor,
     Quit,
 }
 
@@ -79,6 +90,9 @@ pub struct App {
     pub system_dark: bool,
     /// Half-typed time fields (invalid text stays here until it parses).
     pub drafts: std::collections::HashMap<String, String>,
+    pub hk_errors: std::collections::HashMap<usize, String>,
+    pub exercise: Option<Run>,
+    pub updates: UpdateManager,
 }
 
 const FONTS: [&[u8]; 6] = [
@@ -97,7 +111,7 @@ fn main_window_settings() -> window::Settings {
 
 impl App {
     pub fn new(engine: Engine, background: bool) -> (Self, Task<Message>) {
-        let mut app = App { engine, page: Page::Home, main_window: None, system_dark: true, drafts: Default::default() };
+        let mut app = App { engine, page: Page::Home, main_window: None, system_dark: true, drafts: Default::default(), hk_errors: Default::default(), exercise: None, updates: UpdateManager::new(Arc::new(GithubBackend), crate::VERSION) };
         app.engine.start();
         i18n::set_language(&app.engine.settings.general.language);
         let task = if background { Task::none() } else { app.open_main() };
@@ -131,6 +145,13 @@ impl App {
             Message::Tick => {
                 self.engine.on_tick();
                 self.handle_events();
+                if let Some(run) = &mut self.exercise {
+                    if !run.tick(1.0) {
+                        self.exercise = None;
+                    }
+                }
+                self.updates.poll();
+                self.maybe_auto_check();
             }
             Message::Frame => {
                 self.engine.advance_tween(16.0);
@@ -169,11 +190,44 @@ impl App {
                 match actions::apply(&mut self.engine, &Setting::Str(key, text.clone())) {
                     Ok(()) => {
                         self.drafts.remove(&id);
+                        if let actions::StrKey::Hotkey(i) = key {
+                            self.hk_errors.remove(&i);
+                        }
                     }
-                    Err(_) => {
+                    Err(rejected) => {
                         self.drafts.insert(id, text);
+                        if let (actions::StrKey::Hotkey(i), actions::Rejected::BadShortcut(msg)) = (key, rejected) {
+                            self.hk_errors.insert(i, msg);
+                        }
                     }
                 }
+            }
+            Message::StartExercise(id) => self.exercise = Run::start(id),
+            Message::NextExerciseStep => {
+                if let Some(run) = &mut self.exercise {
+                    if !run.next() {
+                        self.exercise = None;
+                    }
+                }
+            }
+            Message::StopExercise => self.exercise = None,
+            Message::CheckUpdates => self.start_check(),
+            Message::DownloadUpdate => self.updates.download(),
+            Message::InstallUpdate => {
+                if self.updates.install().is_ok() {
+                    self.engine.shutdown();
+                    return iced::exit();
+                }
+            }
+            Message::OpenReleasePage => {
+                let page = self.updates.release.as_ref().map(|r| r.page.clone()).unwrap_or_else(|| crate::common::updater::RELEASE_PAGE.to_string());
+                platform::open_url(&page);
+            }
+            Message::PlaySample => {
+                self.engine.play_sound("start", false, true);
+            }
+            Message::OpenAuthor => {
+                platform::open_url("https://github.com/imhamiddev");
             }
             Message::Quit => {
                 self.engine.shutdown();
@@ -181,6 +235,19 @@ impl App {
             }
         }
         Task::none()
+    }
+
+    fn start_check(&mut self) {
+        self.updates.check();
+        self.engine.settings.general.last_update_check = now_epoch();
+        self.engine.save_quietly();
+    }
+
+    fn maybe_auto_check(&mut self) {
+        let g = &self.engine.settings.general;
+        if !self.updates.is_busy() && self.updates.state == crate::updates::UpdateState::Idle && auto_check_due(g.auto_update, g.last_update_check, now_epoch()) {
+            self.start_check();
+        }
     }
 
     /// React to what the engine reported (toasts, break screens... are added by later modules).
@@ -207,15 +274,16 @@ impl App {
             Page::Stats => pages::stats::view(ctx, &self.engine),
             Page::Care => pages::care::view(ctx, &self.engine),
             Page::Display => pages::display::view(ctx, &self.engine, &self.drafts),
-            _ => label::<Message>(ctx, ctx.t(self.page.nav_key()), Txt::H2).into(),
+            Page::Exercises => pages::exercises::view(ctx, self.exercise.as_ref()),
+            Page::Settings => pages::settings::view(ctx, &self.engine, &self.updates, &self.drafts, &self.hk_errors),
         };
-        let heading: Element<'_, Message> = column![
+        let heading: Element<'_, Message> = rcol![ctx; 
             label::<Message>(ctx, ctx.t(if self.page == Page::Home { "app" } else { self.page.nav_key() }), Txt::H1),
             if self.page == Page::Home { label::<Message>(ctx, ctx.t("tagline"), Txt::Muted) } else { label::<Message>(ctx, "", Txt::Muted) },
         ]
         .spacing(6)
         .into();
-        let page = scrollable(container(column![heading, Space::new(0.0, 8.0), body].spacing(16)).padding([32.0, 36.0]).width(Length::Fill)).height(Length::Fill);
+        let page = scrollable(container(rcol![ctx; heading, Space::new(0.0, 8.0), body].spacing(16)).padding([32.0, 36.0]).width(Length::Fill)).height(Length::Fill);
         let layout = h_row(ctx, vec![self.sidebar(ctx), container(page).width(Length::Fill).height(Length::Fill).into()]);
         container(layout).width(Length::Fill).height(Length::Fill).style(move |_| theme::root(p)).into()
     }
@@ -231,7 +299,7 @@ impl App {
         )
         .spacing(10)
         .align_y(Vertical::Center);
-        let mut nav = column![brand, Space::new(0.0, 14.0)].spacing(4);
+        let mut nav = rcol![ctx; brand, Space::new(0.0, 14.0)].spacing(4);
         for page in Page::ALL {
             let active = self.page == page;
             let fg = if active { p.text } else { p.text_muted };
@@ -259,9 +327,13 @@ impl App {
         )
         .padding([10.0, 14.0])
         .style(move |_| theme::card_flat(p));
-        let col = column![nav, Space::new(0.0, Length::Fill), quick].padding([22.0, 16.0]);
+        let col = rcol![ctx; nav, Space::new(0.0, Length::Fill), quick].padding([22.0, 16.0]);
         container(col).width(theme::SIDEBAR_W).height(Length::Fill).style(move |_| theme::sidebar(p)).into()
     }
+}
+
+fn now_epoch() -> f64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs_f64()).unwrap_or(0.0)
 }
 
 /// Start the application (blocks until the user quits).
