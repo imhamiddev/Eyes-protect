@@ -7,7 +7,7 @@ use iced::alignment::{Horizontal, Vertical};
 use iced::font::{Family, Weight};
 use iced::mouse;
 use iced::widget::canvas::{self, Canvas, Frame, Geometry, Path, Stroke};
-use iced::widget::{button, column, container, row, slider, svg, text, toggler, Space};
+use iced::widget::{button, column, container, row, slider, stack, svg, text, toggler, Space};
 use iced::{Background, Border, Color, Element, Font, Length, Padding, Pixels, Point, Rectangle, Renderer, Size, Theme};
 
 use super::icon_data::ICONS;
@@ -279,11 +279,42 @@ pub struct Ring {
     pub thickness: f32,
 }
 
-impl<M> canvas::Program<M> for Ring {
-    type State = ();
+/// Canvas state: geometry is cached and rebuilt only when the data behind it changes
+/// (an uncached frame that changes every second leaves holes with the software renderer).
+#[derive(Default)]
+pub struct CacheState {
+    cache: canvas::Cache,
+    key: std::cell::Cell<u64>,
+}
 
-    fn draw(&self, _s: &(), renderer: &Renderer, _t: &Theme, bounds: Rectangle, _c: mouse::Cursor) -> Vec<Geometry> {
-        let mut frame = Frame::new(renderer, bounds.size());
+impl CacheState {
+    fn geometry(&self, renderer: &Renderer, size: Size, key: u64, build: impl FnOnce(&mut Frame)) -> Geometry {
+        if self.key.get() != key {
+            self.cache.clear();
+            self.key.set(key);
+        }
+        self.cache.draw(renderer, size, build)
+    }
+}
+
+fn hash_of(parts: impl std::hash::Hash) -> u64 {
+    use std::hash::Hasher;
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    parts.hash(&mut h);
+    h.finish()
+}
+
+impl<M> canvas::Program<M> for Ring {
+    type State = CacheState;
+
+    fn draw(&self, state: &CacheState, renderer: &Renderer, _t: &Theme, bounds: Rectangle, _c: mouse::Cursor) -> Vec<Geometry> {
+        let key = hash_of((self.progress.to_bits(), &self.text, self.p.dark, bounds.width.to_bits()));
+        vec![state.geometry(renderer, bounds.size(), key, |frame| self.paint(frame, bounds))]
+    }
+}
+
+impl Ring {
+    fn paint(&self, frame: &mut Frame, bounds: Rectangle) {
         let center = frame.center();
         let radius = bounds.width.min(bounds.height) / 2.0 - self.thickness;
         let track = Path::circle(center, radius);
@@ -311,12 +342,18 @@ impl<M> canvas::Program<M> for Ring {
             vertical_alignment: Vertical::Center,
             ..Default::default()
         });
-        vec![frame.into_geometry()]
     }
 }
 
+/// Draw a canvas in its own layer. The software renderer paints a layer's quads after its
+/// custom geometry, so a canvas placed in the same layer as a card background would be hidden.
+fn on_top<'a, M: 'a>(width: Length, height: Length, canvas: Element<'a, M>) -> Element<'a, M> {
+    stack![Space::new(width, height), canvas].width(width).height(height).into()
+}
+
 pub fn ring<'a, M: 'a>(ctx: Ctx, size: f32, progress: f32, text: String) -> Element<'a, M> {
-    Canvas::new(Ring { progress, text, p: ctx.p, font: ctx.font(Weight::Semibold), thickness: 11.0 }).width(size).height(size).into()
+    let c = Canvas::new(Ring { progress, text, p: ctx.p, font: ctx.font(Weight::Semibold), thickness: 11.0 }).width(size).height(size);
+    on_top(Length::Fixed(size), Length::Fixed(size), c.into())
 }
 
 // -- bar chart ----------------------------------------------------------------------------------
@@ -328,10 +365,16 @@ pub struct BarChart {
 }
 
 impl<M> canvas::Program<M> for BarChart {
-    type State = ();
+    type State = CacheState;
 
-    fn draw(&self, _s: &(), renderer: &Renderer, _t: &Theme, bounds: Rectangle, _c: mouse::Cursor) -> Vec<Geometry> {
-        let mut frame = Frame::new(renderer, bounds.size());
+    fn draw(&self, state: &CacheState, renderer: &Renderer, _t: &Theme, bounds: Rectangle, _c: mouse::Cursor) -> Vec<Geometry> {
+        let key = hash_of((&self.values, &self.labels, self.p.dark, bounds.width.to_bits(), bounds.height.to_bits()));
+        vec![state.geometry(renderer, bounds.size(), key, |frame| self.paint(frame, bounds))]
+    }
+}
+
+impl BarChart {
+    fn paint(&self, frame: &mut Frame, bounds: Rectangle) {
         let n = self.values.len().max(1) as f32;
         let label_h = 22.0;
         let top = 18.0;
@@ -372,10 +415,10 @@ impl<M> canvas::Program<M> for BarChart {
                 });
             }
         }
-        vec![frame.into_geometry()]
     }
 }
 
 pub fn bar_chart<'a, M: 'a>(ctx: Ctx, values: Vec<i64>, labels: Vec<String>, height: f32) -> Element<'a, M> {
-    Canvas::new(BarChart { values, labels, p: ctx.p, font: ctx.font(Weight::Medium) }).width(Length::Fill).height(height).into()
+    let c = Canvas::new(BarChart { values, labels, p: ctx.p, font: ctx.font(Weight::Medium) }).width(Length::Fill).height(height);
+    on_top(Length::Fill, Length::Fixed(height), c.into())
 }
