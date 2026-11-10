@@ -5,10 +5,8 @@ use std::sync::OnceLock;
 
 use iced::alignment::{Horizontal, Vertical};
 use iced::font::{Family, Weight};
-use iced::mouse;
-use iced::widget::canvas::{self, Canvas, Frame, Geometry, Path, Stroke};
 use iced::widget::{button, column, container, row, slider, stack, svg, text, toggler, Space};
-use iced::{Background, Border, Color, Element, Font, Length, Padding, Pixels, Point, Rectangle, Renderer, Size, Theme};
+use iced::{Background, Border, Color, Element, Font, Length, Padding, Renderer, Theme};
 
 use super::icon_data::ICONS;
 use super::theme::{self, Btn, Palette};
@@ -191,7 +189,7 @@ pub fn action_button<'a, M: Clone + 'a>(ctx: Ctx, icon_name: Option<&str>, text_
     if let Some(name) = icon_name {
         items.push(icon(name, 18.0, fg));
     }
-    items.push(text(text_.to_string()).size(theme::F_BODY).font(ctx.font(weight)).into());
+    items.push(text(text_.to_string()).size(theme::F_BODY).font(ctx.font(weight)).wrapping(text::Wrapping::None).into());
     let content = h_row(ctx, items).spacing(8).align_y(Vertical::Center);
     styled_button(ctx, container(content).center_y(Length::Fill), kind, Some(msg))
 }
@@ -271,154 +269,89 @@ pub fn stat_card<'a, M: 'a>(ctx: Ctx, icon_name: &str, caption: &str, value: Str
 }
 
 // -- ring ---------------------------------------------------------------------------------------
-pub struct Ring {
-    pub progress: f32,
-    pub text: String,
-    pub p: Palette,
-    pub font: Font,
-    pub thickness: f32,
+// Drawn as SVG + text: custom canvas geometry was not reliably visible under the software renderer.
+fn hex(c: Color) -> String {
+    format!("#{:02X}{:02X}{:02X}", (c.r * 255.0).round() as u8, (c.g * 255.0).round() as u8, (c.b * 255.0).round() as u8)
 }
 
-/// Canvas state: geometry is cached and rebuilt only when the data behind it changes
-/// (an uncached frame that changes every second leaves holes with the software renderer).
-#[derive(Default)]
-pub struct CacheState {
-    cache: canvas::Cache,
-    key: std::cell::Cell<u64>,
+/// SVG markup of a progress ring (`size` px, stroke `thickness`), progress clamped to 0..=1.
+pub fn ring_svg(size: f32, thickness: f32, progress: f32, track: Color, fill: Color) -> String {
+    let r = size / 2.0 - thickness;
+    let c = std::f32::consts::TAU * r;
+    let p = progress.clamp(0.0, 1.0);
+    let arc = if p > 0.0 {
+        format!(
+            r#"<circle cx="{h}" cy="{h}" r="{r}" fill="none" stroke="{f}" stroke-width="{t}" stroke-linecap="round" stroke-dasharray="{d} {c}" transform="rotate(-90 {h} {h})"/>"#,
+            h = size / 2.0, r = r, f = hex(fill), t = thickness, d = (c * p).max(0.01), c = c
+        )
+    } else {
+        String::new()
+    };
+    format!(
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{s}" height="{s}" viewBox="0 0 {s} {s}"><circle cx="{h}" cy="{h}" r="{r}" fill="none" stroke="{tr}" stroke-width="{t}"/>{arc}</svg>"#,
+        s = size, h = size / 2.0, r = r, tr = hex(track), t = thickness, arc = arc
+    )
 }
 
-impl CacheState {
-    fn geometry(&self, renderer: &Renderer, size: Size, key: u64, build: impl FnOnce(&mut Frame)) -> Geometry {
-        if self.key.get() != key {
-            self.cache.clear();
-            self.key.set(key);
-        }
-        self.cache.draw(renderer, size, build)
-    }
-}
-
-fn hash_of(parts: impl std::hash::Hash) -> u64 {
-    use std::hash::Hasher;
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    parts.hash(&mut h);
-    h.finish()
-}
-
-impl<M> canvas::Program<M> for Ring {
-    type State = CacheState;
-
-    fn draw(&self, state: &CacheState, renderer: &Renderer, _t: &Theme, bounds: Rectangle, _c: mouse::Cursor) -> Vec<Geometry> {
-        let key = hash_of((self.progress.to_bits(), &self.text, self.p.dark, bounds.width.to_bits()));
-        vec![state.geometry(renderer, bounds.size(), key, |frame| self.paint(frame, bounds))]
-    }
-}
-
-impl Ring {
-    fn paint(&self, frame: &mut Frame, bounds: Rectangle) {
-        let center = frame.center();
-        let radius = bounds.width.min(bounds.height) / 2.0 - self.thickness;
-        let track = Path::circle(center, radius);
-        frame.stroke(&track, Stroke::default().with_width(self.thickness).with_color(self.p.surface_raised));
-        let progress = self.progress.clamp(0.0, 1.0);
-        if progress > 0.0 {
-            let start = -std::f32::consts::FRAC_PI_2;
-            let arc = Path::new(|b| {
-                b.arc(canvas::path::Arc {
-                    center,
-                    radius,
-                    start_angle: iced::Radians(start),
-                    end_angle: iced::Radians(start + progress * std::f32::consts::TAU * 0.99999),
-                });
-            });
-            frame.stroke(&arc, Stroke::default().with_width(self.thickness).with_color(self.p.accent).with_line_cap(canvas::LineCap::Round));
-        }
-        frame.fill_text(canvas::Text {
-            content: self.text.clone(),
-            position: center,
-            color: self.p.text,
-            size: Pixels(46.0),
-            font: self.font,
-            horizontal_alignment: Horizontal::Center,
-            vertical_alignment: Vertical::Center,
-            ..Default::default()
-        });
-    }
-}
-
-/// Draw a canvas in its own layer. The software renderer paints a layer's quads after its
-/// custom geometry, so a canvas placed in the same layer as a card background would be hidden.
-fn on_top<'a, M: 'a>(width: Length, height: Length, canvas: Element<'a, M>) -> Element<'a, M> {
-    stack![Space::new(width, height), canvas].width(width).height(height).into()
-}
-
-pub fn ring<'a, M: 'a>(ctx: Ctx, size: f32, progress: f32, text: String) -> Element<'a, M> {
-    let c = Canvas::new(Ring { progress, text, p: ctx.p, font: ctx.font(Weight::Semibold), thickness: 11.0 }).width(size).height(size);
-    on_top(Length::Fixed(size), Length::Fixed(size), c.into())
+pub fn ring<'a, M: 'a>(ctx: Ctx, size: f32, progress: f32, text_: String) -> Element<'a, M> {
+    let markup = ring_svg(size, 11.0, progress, ctx.p.surface_raised, ctx.p.accent);
+    let handle = svg::Handle::from_memory(markup.into_bytes());
+    let center = container(text(text_).size(46).color(ctx.p.text).font(ctx.font(Weight::Semibold))).center(Length::Fill);
+    stack![svg(handle).width(size).height(size), center].width(size).height(size).into()
 }
 
 // -- bar chart ----------------------------------------------------------------------------------
-pub struct BarChart {
-    pub values: Vec<i64>,
-    pub labels: Vec<String>,
-    pub p: Palette,
-    pub font: Font,
-}
-
-impl<M> canvas::Program<M> for BarChart {
-    type State = CacheState;
-
-    fn draw(&self, state: &CacheState, renderer: &Renderer, _t: &Theme, bounds: Rectangle, _c: mouse::Cursor) -> Vec<Geometry> {
-        let key = hash_of((&self.values, &self.labels, self.p.dark, bounds.width.to_bits(), bounds.height.to_bits()));
-        vec![state.geometry(renderer, bounds.size(), key, |frame| self.paint(frame, bounds))]
+/// Height in px of a bar: proportional to `value`, at least 4 px when non-zero.
+pub fn bar_height(value: i64, max: i64, full: f32) -> f32 {
+    if value <= 0 || max <= 0 {
+        return 0.0;
     }
-}
-
-impl BarChart {
-    fn paint(&self, frame: &mut Frame, bounds: Rectangle) {
-        let n = self.values.len().max(1) as f32;
-        let label_h = 22.0;
-        let top = 18.0;
-        let chart_h = (bounds.height - label_h - top).max(10.0);
-        let slot = bounds.width / n;
-        let bar_w = (slot * 0.5).min(34.0);
-        let max = self.values.iter().copied().max().unwrap_or(0).max(1) as f32;
-        for (i, v) in self.values.iter().enumerate() {
-            let x = slot * i as f32 + (slot - bar_w) / 2.0;
-            let h = (chart_h * (*v as f32 / max)).max(if *v > 0 { 4.0 } else { 0.0 });
-            let last = i + 1 == self.values.len();
-            // track
-            frame.fill(&Path::rounded_rectangle(Point::new(x, top), Size::new(bar_w, chart_h), 6.0.into()), self.p.surface_raised);
-            if h > 0.0 {
-                let color = if last { self.p.accent } else { Color { a: 0.55, ..self.p.accent } };
-                frame.fill(&Path::rounded_rectangle(Point::new(x, top + chart_h - h), Size::new(bar_w, h), 6.0.into()), color);
-                frame.fill_text(canvas::Text {
-                    content: v.to_string(),
-                    position: Point::new(x + bar_w / 2.0, top + chart_h - h - 4.0),
-                    color: self.p.text_muted,
-                    size: Pixels(11.0),
-                    font: self.font,
-                    horizontal_alignment: Horizontal::Center,
-                    vertical_alignment: Vertical::Bottom,
-                    ..Default::default()
-                });
-            }
-            if let Some(l) = self.labels.get(i) {
-                frame.fill_text(canvas::Text {
-                    content: l.clone(),
-                    position: Point::new(x + bar_w / 2.0, bounds.height - label_h / 2.0),
-                    color: if last { self.p.text } else { self.p.text_faint },
-                    size: Pixels(11.0),
-                    font: self.font,
-                    horizontal_alignment: Horizontal::Center,
-                    vertical_alignment: Vertical::Center,
-                    ..Default::default()
-                });
-            }
-        }
-    }
+    (full * value as f32 / max as f32).max(4.0)
 }
 
 pub fn bar_chart<'a, M: 'a>(ctx: Ctx, values: Vec<i64>, labels: Vec<String>, height: f32) -> Element<'a, M> {
-    let c = Canvas::new(BarChart { values, labels, p: ctx.p, font: ctx.font(Weight::Medium) }).width(Length::Fill).height(height);
-    on_top(Length::Fill, Length::Fixed(height), c.into())
+    let p = ctx.p;
+    let max = values.iter().copied().max().unwrap_or(0).max(1);
+    let chart_h = (height - 44.0).max(20.0);
+    let last = values.len().saturating_sub(1);
+    let mut cols: Vec<Element<'a, M>> = Vec::new();
+    for (i, v) in values.iter().enumerate() {
+        let h = bar_height(*v, max, chart_h);
+        let fill = if i == last { p.accent } else { Color { a: 0.55, ..p.accent } };
+        let bar = container(Space::new(Length::Fill, h)).width(Length::Fill).style(move |_| container::Style {
+            background: Some(Background::Color(fill)),
+            border: Border { radius: 6.0.into(), ..Border::default() },
+            ..Default::default()
+        });
+        let track = container(bar).width(26).height(chart_h).align_y(Vertical::Bottom).style(move |_| theme::card_flat(p));
+        let value_txt: Element<'a, M> = if *v > 0 { label::<M>(ctx, v.to_string(), Txt::Caption).into() } else { Space::new(0.0, 14.0).into() };
+        let name = labels.get(i).cloned().unwrap_or_default();
+        let name_txt = text(name).size(11).font(ctx.font(Weight::Medium)).color(if i == last { p.text } else { p.text_faint });
+        cols.push(container(column![value_txt, track, name_txt].spacing(4).align_x(Horizontal::Center)).width(Length::Fill).center_x(Length::Fill).into());
+    }
+    h_row(ctx, cols).width(Length::Fill).height(height).into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bar_heights() {
+        assert_eq!(bar_height(0, 10, 100.0), 0.0);
+        assert_eq!(bar_height(10, 10, 100.0), 100.0);
+        assert_eq!(bar_height(5, 10, 100.0), 50.0);
+        assert_eq!(bar_height(1, 1000, 100.0), 4.0); // tiny values stay visible
+    }
+
+    #[test]
+    fn ring_svg_has_track_and_arc_only_with_progress() {
+        let t = Color::from_rgb(0.1, 0.1, 0.1);
+        let a = Color::from_rgb(1.0, 0.0, 0.0);
+        assert_eq!(ring_svg(100.0, 10.0, 0.0, t, a).matches("<circle").count(), 1);
+        let s = ring_svg(100.0, 10.0, 0.5, t, a);
+        assert_eq!(s.matches("<circle").count(), 2);
+        assert!(s.contains("#FF0000") && s.contains("stroke-dasharray"));
+        assert_eq!(ring_svg(100.0, 10.0, 7.0, t, a).matches("<circle").count(), 2); // clamped
+    }
 }
