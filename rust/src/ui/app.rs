@@ -13,6 +13,7 @@ use crate::platform;
 
 use super::actions::{self, Setting};
 use super::pages;
+use super::tray::{Tray, TrayCommand};
 use super::pages::exercises::Run;
 use crate::updates::{auto_check_due, GithubBackend, UpdateManager};
 use super::theme::{self, Btn, Palette};
@@ -80,6 +81,9 @@ pub enum Message {
     OpenReleasePage,
     PlaySample,
     OpenAuthor,
+    /// Poll the tray icon for clicks (~7 times a second).
+    TrayPoll,
+    SetQuiet(Option<f64>),
     Quit,
 }
 
@@ -93,6 +97,7 @@ pub struct App {
     pub hk_errors: std::collections::HashMap<usize, String>,
     pub exercise: Option<Run>,
     pub updates: UpdateManager,
+    pub tray: Option<Tray>,
 }
 
 const FONTS: [&[u8]; 6] = [
@@ -111,9 +116,10 @@ fn main_window_settings() -> window::Settings {
 
 impl App {
     pub fn new(engine: Engine, background: bool) -> (Self, Task<Message>) {
-        let mut app = App { engine, page: Page::Home, main_window: None, system_dark: true, drafts: Default::default(), hk_errors: Default::default(), exercise: None, updates: UpdateManager::new(Arc::new(GithubBackend), crate::VERSION) };
+        let mut app = App { engine, page: Page::Home, main_window: None, system_dark: true, drafts: Default::default(), hk_errors: Default::default(), exercise: None, updates: UpdateManager::new(Arc::new(GithubBackend), crate::VERSION), tray: None };
         app.engine.start();
         i18n::set_language(&app.engine.settings.general.language);
+        app.tray = Tray::new(&app.engine.settings.general.language);
         let task = if background { Task::none() } else { app.open_main() };
         (app, task)
     }
@@ -152,6 +158,10 @@ impl App {
                 }
                 self.updates.poll();
                 self.maybe_auto_check();
+                let (lang, paused, night) = (self.engine.settings.general.language.clone(), self.engine.paused, self.engine.settings.night_light.enabled);
+                if let Some(tray) = &mut self.tray {
+                    tray.sync(&lang, paused, night);
+                }
             }
             Message::Frame => {
                 self.engine.advance_tween(16.0);
@@ -229,6 +239,17 @@ impl App {
             Message::OpenAuthor => {
                 platform::open_url("https://github.com/imhamiddev");
             }
+            Message::TrayPoll => {
+                let commands = self.tray.as_ref().map(|t| t.poll()).unwrap_or_default();
+                let tasks: Vec<Task<Message>> = commands.into_iter().map(|c| self.update(command_message(c))).collect();
+                return Task::batch(tasks);
+            }
+            Message::SetQuiet(minutes) => {
+                match minutes {
+                    Some(m) if m <= 0.0 => self.engine.set_quiet(Some(0.0)),
+                    other => self.engine.set_quiet(other),
+                }
+            }
             Message::Quit => {
                 self.engine.shutdown();
                 return iced::exit();
@@ -260,6 +281,9 @@ impl App {
             iced::time::every(Duration::from_secs(1)).map(|_| Message::Tick),
             window::close_events().map(Message::WindowClosed),
         ];
+        if self.tray.is_some() {
+            subs.push(iced::time::every(Duration::from_millis(150)).map(|_| Message::TrayPoll));
+        }
         if self.engine.is_animating() {
             subs.push(iced::time::every(Duration::from_millis(16)).map(|_| Message::Frame));
         }
@@ -329,6 +353,18 @@ impl App {
         .style(move |_| theme::card_flat(p));
         let col = rcol![ctx; nav, Space::new(0.0, Length::Fill), quick].padding([22.0, 16.0]);
         container(col).width(theme::SIDEBAR_W).height(Length::Fill).style(move |_| theme::sidebar(p)).into()
+    }
+}
+
+/// The app message for a tray menu command.
+pub fn command_message(cmd: TrayCommand) -> Message {
+    match cmd {
+        TrayCommand::Open => Message::OpenMain,
+        TrayCommand::Break => Message::TakeBreak,
+        TrayCommand::TogglePause => Message::TogglePause,
+        TrayCommand::ToggleNight => Message::ToggleNight(true),
+        TrayCommand::Quiet(m) => Message::SetQuiet(m),
+        TrayCommand::Quit => Message::Quit,
     }
 }
 

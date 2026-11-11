@@ -36,6 +36,8 @@ strip = true
 panic = "abort"
 
 [target.'cfg(windows)'.dependencies]
+tray-icon = { version = "0.19", default-features = false }
+image = { version = "0.25", default-features = false, features = ["png"] }
 windows-sys = { version = "0.59", features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
