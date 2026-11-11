@@ -79,10 +79,7 @@ pub fn bullets(body: &str, language: &str) -> Vec<String> {
 /// Bullets for `version` from a changelog text (empty if unknown).
 pub fn notes_from_text(text: &str, version: &str, language: &str, limit: usize) -> Vec<String> {
     let wanted = version.trim_start_matches(['v', 'V']);
-    sections_map(text)
-        .get(wanted)
-        .map(|body| extract_bullets(body, language, limit, 140))
-        .unwrap_or_default()
+    sections_map(text).get(wanted).map(|body| extract_bullets(body, language, limit, 140)).unwrap_or_default()
 }
 
 /// Bullets for `version` from the embedded changelog.

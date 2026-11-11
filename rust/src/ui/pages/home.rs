@@ -59,7 +59,7 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine) -> Element<'a, Message> {
     let hero = card_padded(
         ctx,
         28,
-        rcol![ctx; 
+        rcol![ctx;
             label::<Message>(ctx, ctx.t("home.next_break"), Txt::Caption),
             container(ring(ctx, 230.0, progress, ring_text)).center_x(Length::Fill),
             label_center::<Message>(ctx, status_text(ctx, e), Txt::Muted),
@@ -77,7 +77,7 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine) -> Element<'a, Message> {
     );
 
     let s = &e.stats;
-    let tiles = rcol![ctx; 
+    let tiles = rcol![ctx;
         h_row(
             ctx,
             vec![
@@ -92,7 +92,7 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine) -> Element<'a, Message> {
     let chart = card_padded(
         ctx,
         [18.0, 22.0],
-        rcol![ctx; 
+        rcol![ctx;
             label::<Message>(ctx, ctx.t("home.week"), Txt::Title),
             bar_chart(ctx, s.last_days("breaks", 7, None), weekday_labels(ctx, 7), 150.0),
         ]

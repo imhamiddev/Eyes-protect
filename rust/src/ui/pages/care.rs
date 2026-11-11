@@ -1,6 +1,5 @@
 //! Care: 20-20-20 rule, smart pause and the blink / hydration / stretch reminders.
 
-
 use iced::Element;
 
 use crate::engine::Engine;

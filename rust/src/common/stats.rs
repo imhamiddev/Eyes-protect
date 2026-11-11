@@ -51,10 +51,7 @@ impl Stats {
     }
 
     pub fn load(&mut self) {
-        self.data = std::fs::read_to_string(&self.path)
-            .ok()
-            .and_then(|t| serde_json::from_str(&t).ok())
-            .unwrap_or_default();
+        self.data = std::fs::read_to_string(&self.path).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
     }
 
     pub fn save(&self) {
@@ -64,7 +61,11 @@ impl Stats {
     }
 
     fn check(kind: &str) -> Result<(), UnknownStat> {
-        if KINDS.contains(&kind) { Ok(()) } else { Err(UnknownStat(kind.to_string())) }
+        if KINDS.contains(&kind) {
+            Ok(())
+        } else {
+            Err(UnknownStat(kind.to_string()))
+        }
     }
 
     pub fn add(&mut self, kind: &str, day: Option<NaiveDate>, amount: i64, save: bool) -> Result<(), UnknownStat> {

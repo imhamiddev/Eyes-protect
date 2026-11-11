@@ -28,7 +28,11 @@ pub struct Ctx {
 
 impl Ctx {
     pub fn lang(&self) -> &'static str {
-        if self.fa { "fa" } else { "en" }
+        if self.fa {
+            "fa"
+        } else {
+            "en"
+        }
     }
 
     /// Translate `key` into the UI language.
@@ -100,7 +104,11 @@ pub fn label<'a, M: 'a>(ctx: Ctx, content: impl text::IntoFragment<'a>, kind: Tx
     let font = ctx.font_for(&content, weight);
     let rtl = is_rtl_text(&content);
     let t = text(content).size(size).color(color).font(font).shaping(text::Shaping::Advanced);
-    if rtl { t.width(estimate_width(&content_copy, size)) } else { t }
+    if rtl {
+        t.width(estimate_width(&content_copy, size))
+    } else {
+        t
+    }
 }
 
 /// Like [`label`], centred (for use inside a centred container).
@@ -108,7 +116,11 @@ pub fn label_center<'a, M: 'a>(ctx: Ctx, content: impl text::IntoFragment<'a>, k
     let content = content.into_fragment();
     let rtl = is_rtl_text(&content);
     let t = label::<M>(ctx, content, kind);
-    if rtl { t } else { t.width(Length::Fill).align_x(Horizontal::Center) }
+    if rtl {
+        t
+    } else {
+        t.width(Length::Fill).align_x(Horizontal::Center)
+    }
 }
 
 // -- icons --------------------------------------------------------------------------------
@@ -129,11 +141,7 @@ fn handles() -> &'static HashMap<&'static str, svg::Handle> {
 
 pub fn icon<'a, M: 'a>(name: &str, size: f32, color: Color) -> Element<'a, M> {
     match handles().get(name) {
-        Some(h) => svg(h.clone())
-            .width(size)
-            .height(size)
-            .style(move |_: &Theme, _| svg::Style { color: Some(color) })
-            .into(),
+        Some(h) => svg(h.clone()).width(size).height(size).style(move |_: &Theme, _| svg::Style { color: Some(color) }).into(),
         None => Space::new(size, size).into(),
     }
 }
@@ -184,15 +192,9 @@ pub fn setting_row<'a, M: Clone + 'a>(ctx: Ctx, title: &str, desc: &str, control
     if !desc.is_empty() {
         text_col = text_col.push(label::<M>(ctx, desc.to_string(), Txt::Caption));
     }
-    let r = h_row(
-        ctx,
-        vec![
-            container(text_col).width(Length::Fill).into(),
-            container(control).align_y(Vertical::Center).into(),
-        ],
-    )
-    .spacing(16)
-    .align_y(Vertical::Center);
+    let r = h_row(ctx, vec![container(text_col).width(Length::Fill).into(), container(control).align_y(Vertical::Center).into()])
+        .spacing(16)
+        .align_y(Vertical::Center);
     container(r).padding(Padding::from([14.0, 0.0])).width(Length::Fill).into()
 }
 
@@ -218,7 +220,8 @@ pub fn toggle<'a, M: 'a>(ctx: Ctx, on: bool, msg: impl Fn(bool) -> M + 'a) -> El
 
 pub fn styled_button<'a, M: Clone + 'a>(ctx: Ctx, content: impl Into<Element<'a, M>>, kind: Btn, msg: Option<M>) -> button::Button<'a, M> {
     let p = ctx.p;
-    let b = button(content).padding(Padding::from([0.0, 18.0])).height(theme::BUTTON_H).style(move |_, st| theme::button_style(p, kind, st));
+    let b =
+        button(content).padding(Padding::from([0.0, 18.0])).height(theme::BUTTON_H).style(move |_, st| theme::button_style(p, kind, st));
     match msg {
         Some(m) => b.on_press(m),
         None => b,
@@ -245,12 +248,22 @@ pub fn action_button<'a, M: Clone + 'a>(ctx: Ctx, icon_name: Option<&str>, text_
 }
 
 /// Slider with a value read-out: `[----o----] 40`.
-pub fn slider_row<'a, M: Clone + 'a>(ctx: Ctx, range: std::ops::RangeInclusive<i32>, value: i32, suffix: &str, msg: impl Fn(i32) -> M + 'a) -> Element<'a, M> {
+pub fn slider_row<'a, M: Clone + 'a>(
+    ctx: Ctx,
+    range: std::ops::RangeInclusive<i32>,
+    value: i32,
+    suffix: &str,
+    msg: impl Fn(i32) -> M + 'a,
+) -> Element<'a, M> {
     let p = ctx.p;
     let s = slider(range, value, msg).width(220).style(move |_: &Theme, status| {
         let hovered = matches!(status, slider::Status::Hovered | slider::Status::Dragged);
         slider::Style {
-            rail: slider::Rail { backgrounds: (Background::Color(p.accent), Background::Color(p.surface_raised)), width: 6.0, border: Border { radius: 3.0.into(), ..Border::default() } },
+            rail: slider::Rail {
+                backgrounds: (Background::Color(p.accent), Background::Color(p.surface_raised)),
+                width: 6.0,
+                border: Border { radius: 3.0.into(), ..Border::default() },
+            },
             handle: slider::Handle {
                 shape: slider::HandleShape::Circle { radius: 9.0 },
                 background: Background::Color(if hovered { p.accent } else { p.text }),
@@ -259,12 +272,23 @@ pub fn slider_row<'a, M: Clone + 'a>(ctx: Ctx, range: std::ops::RangeInclusive<i
             },
         }
     });
-    let readout = container(label::<M>(ctx, format!("{value}{suffix}"), Txt::Muted)).width(52).align_x(if ctx.fa { Horizontal::Left } else { Horizontal::Right });
+    let readout = container(label::<M>(ctx, format!("{value}{suffix}"), Txt::Muted)).width(52).align_x(if ctx.fa {
+        Horizontal::Left
+    } else {
+        Horizontal::Right
+    });
     h_row(ctx, vec![s.into(), readout.into()]).spacing(12).align_y(Vertical::Center).into()
 }
 
 /// Number stepper: `[-] 20 [+]`.
-pub fn stepper<'a, M: Clone + 'a>(ctx: Ctx, value: i64, min: i64, max: i64, step: i64, msg: impl Fn(i64) -> M + Clone + 'a) -> Element<'a, M> {
+pub fn stepper<'a, M: Clone + 'a>(
+    ctx: Ctx,
+    value: i64,
+    min: i64,
+    max: i64,
+    step: i64,
+    msg: impl Fn(i64) -> M + Clone + 'a,
+) -> Element<'a, M> {
     let p = ctx.p;
     let small = move |name: &str, target: i64, enabled: bool, m: M| {
         let b = button(container(icon(name, 16.0, if enabled { p.text } else { p.text_faint })).center(Length::Fill))
@@ -272,19 +296,23 @@ pub fn stepper<'a, M: Clone + 'a>(ctx: Ctx, value: i64, min: i64, max: i64, step
             .height(theme::CONTROL_H)
             .style(move |_, st| theme::button_style(p, Btn::Secondary, st));
         let _ = target;
-        if enabled { b.on_press(m) } else { b }
+        if enabled {
+            b.on_press(m)
+        } else {
+            b
+        }
     };
     let dec = (value - step).max(min);
     let inc = (value + step).min(max);
-    let value_box = container(label::<M>(ctx, value.to_string(), Txt::Body)).width(56).center_x(56).center_y(theme::CONTROL_H).style(move |_| theme::card_flat(p));
-    row![
-        small("minus", dec, value > min, msg(dec)),
-        value_box,
-        small("plus", inc, value < max, msg(inc)),
-    ]
-    .spacing(6)
-    .align_y(Vertical::Center)
-    .into()
+    let value_box = container(label::<M>(ctx, value.to_string(), Txt::Body))
+        .width(56)
+        .center_x(56)
+        .center_y(theme::CONTROL_H)
+        .style(move |_| theme::card_flat(p));
+    row![small("minus", dec, value > min, msg(dec)), value_box, small("plus", inc, value < max, msg(inc)),]
+        .spacing(6)
+        .align_y(Vertical::Center)
+        .into()
 }
 
 /// Segmented control: one option is active.
@@ -299,7 +327,13 @@ pub fn segmented<'a, M: Clone + 'a>(ctx: Ctx, options: &[(&str, String)], active
             .style(move |_, st| {
                 let hovered = matches!(st, button::Status::Hovered);
                 button::Style {
-                    background: Some(Background::Color(if on { p.accent } else if hovered { p.surface_hover } else { Color::TRANSPARENT })),
+                    background: Some(Background::Color(if on {
+                        p.accent
+                    } else if hovered {
+                        p.surface_hover
+                    } else {
+                        Color::TRANSPARENT
+                    })),
                     text_color: if on { p.on_accent } else { p.text_muted },
                     border: Border { radius: 9.0.into(), ..Border::default() },
                     ..Default::default()
@@ -314,7 +348,9 @@ pub fn segmented<'a, M: Clone + 'a>(ctx: Ctx, options: &[(&str, String)], active
 // -- stat card --------------------------------------------------------------------------------
 pub fn stat_card<'a, M: 'a>(ctx: Ctx, icon_name: &str, caption: &str, value: String) -> Element<'a, M> {
     let p = ctx.p;
-    let head = h_row(ctx, vec![icon(icon_name, 18.0, p.accent), label::<M>(ctx, caption.to_string(), Txt::Muted).into()]).spacing(8).align_y(Vertical::Center);
+    let head = h_row(ctx, vec![icon(icon_name, 18.0, p.accent), label::<M>(ctx, caption.to_string(), Txt::Muted).into()])
+        .spacing(8)
+        .align_y(Vertical::Center);
     card_padded(ctx, Padding::from([18.0, 22.0]), rcol![ctx; head, label::<M>(ctx, value, Txt::H1)].spacing(10))
 }
 
@@ -332,14 +368,24 @@ pub fn ring_svg(size: f32, thickness: f32, progress: f32, track: Color, fill: Co
     let arc = if p > 0.0 {
         format!(
             r#"<circle cx="{h}" cy="{h}" r="{r}" fill="none" stroke="{f}" stroke-width="{t}" stroke-linecap="round" stroke-dasharray="{d} {c}" transform="rotate(-90 {h} {h})"/>"#,
-            h = size / 2.0, r = r, f = hex(fill), t = thickness, d = (c * p).max(0.01), c = c
+            h = size / 2.0,
+            r = r,
+            f = hex(fill),
+            t = thickness,
+            d = (c * p).max(0.01),
+            c = c
         )
     } else {
         String::new()
     };
     format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" width="{s}" height="{s}" viewBox="0 0 {s} {s}"><circle cx="{h}" cy="{h}" r="{r}" fill="none" stroke="{tr}" stroke-width="{t}"/>{arc}</svg>"#,
-        s = size, h = size / 2.0, r = r, tr = hex(track), t = thickness, arc = arc
+        s = size,
+        h = size / 2.0,
+        r = r,
+        tr = hex(track),
+        t = thickness,
+        arc = arc
     )
 }
 
@@ -374,10 +420,16 @@ pub fn bar_chart<'a, M: 'a>(ctx: Ctx, values: Vec<i64>, labels: Vec<String>, hei
             ..Default::default()
         });
         let track = container(bar).width(26).height(chart_h).align_y(Vertical::Bottom).style(move |_| theme::card_flat(p));
-        let value_txt: Element<'a, M> = if *v > 0 { label::<M>(ctx, v.to_string(), Txt::Caption).into() } else { Space::new(0.0, 14.0).into() };
+        let value_txt: Element<'a, M> =
+            if *v > 0 { label::<M>(ctx, v.to_string(), Txt::Caption).into() } else { Space::new(0.0, 14.0).into() };
         let name = labels.get(i).cloned().unwrap_or_default();
         let name_txt = shrink_text(ctx, &name, 11.0, Weight::Medium).color(if i == last { p.text } else { p.text_faint });
-        cols.push(container(rcol![ctx; value_txt, track, name_txt].spacing(4).align_x(Horizontal::Center)).width(Length::Fill).center_x(Length::Fill).into());
+        cols.push(
+            container(rcol![ctx; value_txt, track, name_txt].spacing(4).align_x(Horizontal::Center))
+                .width(Length::Fill)
+                .center_x(Length::Fill)
+                .into(),
+        );
     }
     h_row(ctx, cols).width(Length::Fill).height(height).into()
 }
@@ -402,6 +454,7 @@ mod tests {
         let s = ring_svg(100.0, 10.0, 0.5, t, a);
         assert_eq!(s.matches("<circle").count(), 2);
         assert!(s.contains("#FF0000") && s.contains("stroke-dasharray"));
-        assert_eq!(ring_svg(100.0, 10.0, 7.0, t, a).matches("<circle").count(), 2); // clamped
+        assert_eq!(ring_svg(100.0, 10.0, 7.0, t, a).matches("<circle").count(), 2);
+        // clamped
     }
 }

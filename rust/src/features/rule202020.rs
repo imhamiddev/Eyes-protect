@@ -167,14 +167,7 @@ mod tests {
     use super::*;
 
     fn cfg(enabled: bool, use_break_lock: bool, detect: bool) -> RuleSettings {
-        RuleSettings {
-            enabled,
-            interval_min: 1,
-            break_seconds: 5,
-            snooze_min: 1,
-            detect_natural_breaks: detect,
-            use_break_lock,
-        }
+        RuleSettings { enabled, interval_min: 1, break_seconds: 5, snooze_min: 1, detect_natural_breaks: detect, use_break_lock }
     }
     fn make() -> Rule202020 {
         Rule202020::new(&cfg(true, false, true))

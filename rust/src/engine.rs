@@ -13,7 +13,7 @@ use chrono::NaiveTime;
 
 use crate::common::cities::city_by_key;
 use crate::common::colortemp::{build_ramp, channel_multipliers, identity_ramp};
-use crate::common::config::{save_settings_to, settings_path, load_settings_from, Settings};
+use crate::common::config::{load_settings_from, save_settings_to, settings_path, Settings};
 use crate::common::monitors as mon;
 use crate::common::sounds::SoundPlayer;
 use crate::common::stats::Stats;
@@ -56,7 +56,11 @@ struct Tween {
 }
 
 fn ease_in_out_cubic(t: f64) -> f64 {
-    if t < 0.5 { 4.0 * t * t * t } else { 1.0 - (-2.0 * t + 2.0).powi(3) / 2.0 }
+    if t < 0.5 {
+        4.0 * t * t * t
+    } else {
+        1.0 - (-2.0 * t + 2.0).powi(3) / 2.0
+    }
 }
 
 /// Command line stored in the Windows Run key.
@@ -611,7 +615,10 @@ mod tests {
         }
     }
     fn kinds(e: &mut Engine) -> Vec<EngineEvent> {
-        e.drain_events().into_iter().filter(|ev| !matches!(ev, EngineEvent::StateChanged | EngineEvent::BreakTick(_) | EngineEvent::DisplayChanged(_))).collect()
+        e.drain_events()
+            .into_iter()
+            .filter(|ev| !matches!(ev, EngineEvent::StateChanged | EngineEvent::BreakTick(_) | EngineEvent::DisplayChanged(_)))
+            .collect()
     }
 
     #[test]

@@ -22,11 +22,8 @@ pub struct SunTimes {
 pub fn sun_times(day: NaiveDate, lat: f64, lon: f64, utc_offset_hours: f64) -> SunTimes {
     let n = f64::from(day.ordinal());
     let g = 2.0 * PI / 365.0 * (n - 1.0);
-    let eqtime = 229.18
-        * (0.000075 + 0.001868 * g.cos() - 0.032077 * g.sin() - 0.014615 * (2.0 * g).cos()
-            - 0.040849 * (2.0 * g).sin());
-    let decl = 0.006918 - 0.399912 * g.cos() + 0.070257 * g.sin() - 0.006758 * (2.0 * g).cos()
-        + 0.000907 * (2.0 * g).sin()
+    let eqtime = 229.18 * (0.000075 + 0.001868 * g.cos() - 0.032077 * g.sin() - 0.014615 * (2.0 * g).cos() - 0.040849 * (2.0 * g).sin());
+    let decl = 0.006918 - 0.399912 * g.cos() + 0.070257 * g.sin() - 0.006758 * (2.0 * g).cos() + 0.000907 * (2.0 * g).sin()
         - 0.002697 * (3.0 * g).cos()
         + 0.00148 * (3.0 * g).sin();
     let lat_r = lat.to_radians();
@@ -41,11 +38,7 @@ pub fn sun_times(day: NaiveDate, lat: f64, lon: f64, utc_offset_hours: f64) -> S
     let offset = utc_offset_hours * 60.0;
     let sunrise = 720.0 - 4.0 * (lon + ha) - eqtime + offset;
     let sunset = 720.0 - 4.0 * (lon - ha) - eqtime + offset;
-    SunTimes {
-        sunrise: Some(sunrise.rem_euclid(1440.0)),
-        sunset: Some(sunset.rem_euclid(1440.0)),
-        polar: None,
-    }
+    SunTimes { sunrise: Some(sunrise.rem_euclid(1440.0)), sunset: Some(sunset.rem_euclid(1440.0)), polar: None }
 }
 
 pub fn format_minutes(minutes: f64) -> String {

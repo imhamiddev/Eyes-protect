@@ -31,13 +31,13 @@ impl Run {
     pub fn tick(&mut self, dt: f64) -> bool {
         self.left -= dt;
         if self.left <= 0.0 {
-            return self.next();
+            return self.advance();
         }
         true
     }
 
     /// Jump to the next step; `false` when there is none.
-    pub fn next(&mut self) -> bool {
+    pub fn advance(&mut self) -> bool {
         let steps = self.exercise().steps;
         self.step += 1;
         match steps.get(self.step) {
@@ -51,14 +51,18 @@ impl Run {
 }
 
 fn pick<'a>(ctx: Ctx, en: &'a str, fa: &'a str) -> &'a str {
-    if ctx.fa { fa } else { en }
+    if ctx.fa {
+        fa
+    } else {
+        en
+    }
 }
 
 fn list_card<'a>(ctx: Ctx, items: &'static [Exercise]) -> Element<'a, Message> {
     let p = ctx.p;
     let mut rows: Vec<Element<'a, Message>> = Vec::new();
     for ex in items {
-        let info = rcol![ctx; 
+        let info = rcol![ctx;
             label::<Message>(ctx, pick(ctx, ex.title_en, ex.title_fa).to_string(), Txt::Body),
             label::<Message>(ctx, format!("{} {}", ex.total_seconds(), ctx.t("ex.seconds")), Txt::Caption),
         ]
@@ -84,7 +88,7 @@ pub fn view<'a>(ctx: Ctx, run: Option<&Run>) -> Element<'a, Message> {
         let ex = run.exercise();
         let step = &ex.steps[run.step];
         let total = f64::from(step.seconds);
-        let body = rcol![ctx; 
+        let body = rcol![ctx;
             label::<Message>(ctx, format!("{} · {}/{}", pick(ctx, ex.title_en, ex.title_fa), run.step + 1, ex.steps.len()), Txt::Caption),
             container(ring(ctx, 200.0, (1.0 - run.left / total) as f32, format_mmss(run.left.ceil() as i64))).center_x(Length::Fill),
             label_center::<Message>(ctx, pick(ctx, step.en, step.fa).to_string(), Txt::Title),
@@ -130,9 +134,9 @@ mod tests {
     #[test]
     fn next_skips_the_rest_of_a_step() {
         let mut run = Run::start("palming").unwrap();
-        assert!(run.next());
+        assert!(run.advance());
         assert_eq!(run.step, 1);
-        while run.next() {}
-        assert!(!run.next());
+        while run.advance() {}
+        assert!(!run.advance());
     }
 }

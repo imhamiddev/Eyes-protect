@@ -285,10 +285,7 @@ pub fn can_self_update() -> bool {
 
 /// Shell line that waits briefly for this process to exit, then runs the silent installer.
 pub fn installer_command(installer: &Path) -> String {
-    format!(
-        "ping -n 4 127.0.0.1 >nul & start \"\" \"{}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS",
-        installer.display()
-    )
+    format!("ping -n 4 127.0.0.1 >nul & start \"\" \"{}\" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS", installer.display())
 }
 
 /// Start the installer detached; the caller must quit the app right after.
@@ -387,7 +384,8 @@ mod tests {
                     }
                 }
                 let reply = if line.contains("/redirect") {
-                    "HTTP/1.1 302 Found\r\nLocation: https://evil.example.com/x\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_string()
+                    "HTTP/1.1 302 Found\r\nLocation: https://evil.example.com/x\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                        .to_string()
                 } else {
                     "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello".to_string()
                 };
@@ -398,7 +396,15 @@ mod tests {
     }
 
     fn info(url: &str, sha: Option<String>, size: u64) -> ReleaseInfo {
-        ReleaseInfo { version: "0.3.0".into(), tag: "v0.3.0".into(), notes: String::new(), url: url.into(), size, sha256: sha, page: "p".into() }
+        ReleaseInfo {
+            version: "0.3.0".into(),
+            tag: "v0.3.0".into(),
+            notes: String::new(),
+            url: url.into(),
+            size,
+            sha256: sha,
+            page: "p".into(),
+        }
     }
     fn hello_sha() -> String {
         hex(&Sha256::digest(b"hello"))
@@ -414,7 +420,15 @@ mod tests {
     fn download_verifies_and_reports_progress() {
         let (base, dir) = (server(), tempfile::tempdir().unwrap());
         let mut seen = Vec::new();
-        let out = download(&info(&format!("{base}/f"), Some(hello_sha()), 5), &dir.path().join("s.exe"), &mut |p| seen.push(p), &|| false, Duration::from_secs(5), &local()).unwrap();
+        let out = download(
+            &info(&format!("{base}/f"), Some(hello_sha()), 5),
+            &dir.path().join("s.exe"),
+            &mut |p| seen.push(p),
+            &|| false,
+            Duration::from_secs(5),
+            &local(),
+        )
+        .unwrap();
         assert_eq!(std::fs::read(out).unwrap(), b"hello");
         assert_eq!(*seen.last().unwrap(), 1.0);
         assert_eq!(parts_in(dir.path()), 0);
@@ -423,7 +437,15 @@ mod tests {
     #[test]
     fn download_rejects_bad_checksum() {
         let (base, dir) = (server(), tempfile::tempdir().unwrap());
-        let err = download(&info(&format!("{base}/f"), Some("0".repeat(64)), 5), &dir.path().join("s.exe"), &mut |_| {}, &|| false, Duration::from_secs(5), &local()).unwrap_err();
+        let err = download(
+            &info(&format!("{base}/f"), Some("0".repeat(64)), 5),
+            &dir.path().join("s.exe"),
+            &mut |_| {},
+            &|| false,
+            Duration::from_secs(5),
+            &local(),
+        )
+        .unwrap_err();
         assert!(err.to_string().contains("checksum"), "{err}");
         assert!(!dir.path().join("s.exe").exists());
         assert_eq!(parts_in(dir.path()), 0);
@@ -432,28 +454,60 @@ mod tests {
     #[test]
     fn download_rejects_wrong_size() {
         let (base, dir) = (server(), tempfile::tempdir().unwrap());
-        let err = download(&info(&format!("{base}/f"), Some(hello_sha()), 99), &dir.path().join("s.exe"), &mut |_| {}, &|| false, Duration::from_secs(5), &local()).unwrap_err();
+        let err = download(
+            &info(&format!("{base}/f"), Some(hello_sha()), 99),
+            &dir.path().join("s.exe"),
+            &mut |_| {},
+            &|| false,
+            Duration::from_secs(5),
+            &local(),
+        )
+        .unwrap_err();
         assert!(err.to_string().contains("size"), "{err}");
     }
 
     #[test]
     fn download_blocks_untrusted_redirect() {
         let (base, dir) = (server(), tempfile::tempdir().unwrap());
-        let err = download(&info(&format!("{base}/redirect"), Some(hello_sha()), 5), &dir.path().join("s.exe"), &mut |_| {}, &|| false, Duration::from_secs(5), &local()).unwrap_err();
+        let err = download(
+            &info(&format!("{base}/redirect"), Some(hello_sha()), 5),
+            &dir.path().join("s.exe"),
+            &mut |_| {},
+            &|| false,
+            Duration::from_secs(5),
+            &local(),
+        )
+        .unwrap_err();
         assert!(err.to_string().contains("blocked redirect"), "{err}");
     }
 
     #[test]
     fn download_blocks_untrusted_start_url() {
         let dir = tempfile::tempdir().unwrap();
-        let err = download(&info("https://evil.example.com/a.exe", None, 0), &dir.path().join("s.exe"), &mut |_| {}, &|| false, Duration::from_secs(5), &Policy::github()).unwrap_err();
+        let err = download(
+            &info("https://evil.example.com/a.exe", None, 0),
+            &dir.path().join("s.exe"),
+            &mut |_| {},
+            &|| false,
+            Duration::from_secs(5),
+            &Policy::github(),
+        )
+        .unwrap_err();
         assert!(err.to_string().contains("untrusted"), "{err}");
     }
 
     #[test]
     fn download_can_be_cancelled() {
         let (base, dir) = (server(), tempfile::tempdir().unwrap());
-        let err = download(&info(&format!("{base}/f"), Some(hello_sha()), 5), &dir.path().join("s.exe"), &mut |_| {}, &|| true, Duration::from_secs(5), &local()).unwrap_err();
+        let err = download(
+            &info(&format!("{base}/f"), Some(hello_sha()), 5),
+            &dir.path().join("s.exe"),
+            &mut |_| {},
+            &|| true,
+            Duration::from_secs(5),
+            &local(),
+        )
+        .unwrap_err();
         assert_eq!(err, UpdateError::Cancelled);
         assert_eq!(parts_in(dir.path()), 0);
     }

@@ -108,16 +108,30 @@ pub fn card(p: Palette) -> container::Style {
         background: Some(Background::Color(p.surface)),
         border: border(p.border, R_LG),
         text_color: Some(p.text),
-        shadow: if p.dark { Shadow::default() } else { Shadow { color: Color { a: 0.06, ..Color::BLACK }, offset: Vector::new(0.0, 4.0), blur_radius: 14.0 } },
+        shadow: if p.dark {
+            Shadow::default()
+        } else {
+            Shadow { color: Color { a: 0.06, ..Color::BLACK }, offset: Vector::new(0.0, 4.0), blur_radius: 14.0 }
+        },
     }
 }
 
 pub fn card_flat(p: Palette) -> container::Style {
-    container::Style { background: Some(Background::Color(p.surface_raised)), border: Border { radius: R_MD.into(), ..Border::default() }, text_color: Some(p.text), ..Default::default() }
+    container::Style {
+        background: Some(Background::Color(p.surface_raised)),
+        border: Border { radius: R_MD.into(), ..Border::default() },
+        text_color: Some(p.text),
+        ..Default::default()
+    }
 }
 
 pub fn sidebar(p: Palette) -> container::Style {
-    container::Style { background: Some(Background::Color(p.bg)), border: Border { color: p.border, width: 0.0, radius: 0.0.into() }, text_color: Some(p.text), ..Default::default() }
+    container::Style {
+        background: Some(Background::Color(p.bg)),
+        border: Border { color: p.border, width: 0.0, radius: 0.0.into() },
+        text_color: Some(p.text),
+        ..Default::default()
+    }
 }
 
 pub fn divider(p: Palette) -> container::Style {
@@ -125,7 +139,12 @@ pub fn divider(p: Palette) -> container::Style {
 }
 
 pub fn pill(p: Palette) -> container::Style {
-    container::Style { background: Some(Background::Color(p.accent_soft)), border: Border { radius: 999.0.into(), ..Border::default() }, text_color: Some(p.text), ..Default::default() }
+    container::Style {
+        background: Some(Background::Color(p.accent_soft)),
+        border: Border { radius: 999.0.into(), ..Border::default() },
+        text_color: Some(p.text),
+        ..Default::default()
+    }
 }
 
 pub fn overlay(p: Palette) -> container::Style {
@@ -162,11 +181,23 @@ pub fn button_style(p: Palette, kind: Btn, status: button::Status) -> button::St
     let (bg, fg, brd) = match kind {
         Btn::Primary => {
             let base = p.accent;
-            let bg = if pressed { rgb(0xC2E357) } else if hovered { rgb(0xDDF88A) } else { base };
+            let bg = if pressed {
+                rgb(0xC2E357)
+            } else if hovered {
+                rgb(0xDDF88A)
+            } else {
+                base
+            };
             (Some(bg), p.on_accent, Border { radius: radius.into(), ..Border::default() })
         }
         Btn::Secondary => {
-            let bg = if pressed { p.surface_raised } else if hovered { p.surface_hover } else { p.surface };
+            let bg = if pressed {
+                p.surface_raised
+            } else if hovered {
+                p.surface_hover
+            } else {
+                p.surface
+            };
             (Some(bg), p.text, border(p.border, radius))
         }
         Btn::Ghost => {
@@ -184,7 +215,11 @@ pub fn button_style(p: Palette, kind: Btn, status: button::Status) -> button::St
     };
     let style = button::Style { background: bg.map(Background::Color), text_color: fg, border: brd, shadow: Shadow::default() };
     if disabled {
-        button::Style { text_color: p.text_faint, background: Some(Background::Color(if kind == Btn::Primary { p.accent_soft } else { p.surface_raised })), ..style }
+        button::Style {
+            text_color: p.text_faint,
+            background: Some(Background::Color(if kind == Btn::Primary { p.accent_soft } else { p.surface_raised })),
+            ..style
+        }
     } else {
         style
     }

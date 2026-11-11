@@ -11,10 +11,7 @@ pub fn kelvin_to_rgb(kelvin: f64) -> (f64, f64, f64) {
     let (r, g) = if t <= 66.0 {
         (255.0, 99.4708025861 * t.ln() - 161.1195681661)
     } else {
-        (
-            329.698727446 * (t - 60.0).powf(-0.1332047592),
-            288.1221695283 * (t - 60.0).powf(-0.0755148492),
-        )
+        (329.698727446 * (t - 60.0).powf(-0.1332047592), 288.1221695283 * (t - 60.0).powf(-0.0755148492))
     };
     let b = if t >= 66.0 {
         255.0
@@ -30,8 +27,7 @@ pub fn kelvin_to_rgb(kelvin: f64) -> (f64, f64, f64) {
 /// Map a 0..100 warmth slider onto 6500K (off) .. 1900K (very warm).
 pub fn strength_to_kelvin(strength: i32) -> i32 {
     let s = f64::from(strength.clamp(0, 100));
-    (f64::from(NEUTRAL_KELVIN) - f64::from(NEUTRAL_KELVIN - MIN_KELVIN) * s / 100.0)
-        .round_ties_even() as i32
+    (f64::from(NEUTRAL_KELVIN) - f64::from(NEUTRAL_KELVIN - MIN_KELVIN) * s / 100.0).round_ties_even() as i32
 }
 
 pub fn kelvin_to_strength(kelvin: i32) -> i32 {

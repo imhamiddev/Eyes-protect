@@ -12,11 +12,7 @@ pub fn plan(cfg: &Hotkeys) -> Vec<Binding> {
         return Vec::new();
     }
     let combos = [&cfg.night_light, &cfg.break_now, &cfg.pause, &cfg.quiet];
-    combos
-        .iter()
-        .enumerate()
-        .filter_map(|(i, combo)| parse_combo(combo).ok().map(|(mods, vk)| (i, mods | MOD_NOREPEAT, vk)))
-        .collect()
+    combos.iter().enumerate().filter_map(|(i, combo)| parse_combo(combo).ok().map(|(mods, vk)| (i, mods | MOD_NOREPEAT, vk))).collect()
 }
 
 pub fn action_name(index: usize) -> &'static str {

@@ -191,12 +191,20 @@ pub fn apply(engine: &mut Engine, change: &Setting) -> Result<(), Rejected> {
         },
         Setting::MonitorOn(key, on) => {
             let mut excluded = mon::parse_set(&s.monitors.excluded);
-            if *on { excluded.remove(key) } else { excluded.insert(key.clone()) };
+            if *on {
+                excluded.remove(key)
+            } else {
+                excluded.insert(key.clone())
+            };
             s.monitors.excluded = mon::format_set(excluded);
         }
         Setting::MonitorBrightness(key, v) => {
             let mut factors = mon::parse_map(&s.monitors.brightness);
-            if *v < 100 { factors.insert(key.clone(), clamp(*v, 30, 100) as i32) } else { factors.remove(key) };
+            if *v < 100 {
+                factors.insert(key.clone(), clamp(*v, 30, 100) as i32)
+            } else {
+                factors.remove(key)
+            };
             s.monitors.brightness = mon::format_map(&factors);
         }
     }
@@ -214,7 +222,12 @@ mod tests {
 
     fn engine() -> (tempfile::TempDir, Engine) {
         let dir = tempfile::tempdir().unwrap();
-        let e = Engine::new(Settings::default(), Stats::open(dir.path().join("st.json")), Some(dir.path().join("s.json")), Arc::new(NullPlatform));
+        let e = Engine::new(
+            Settings::default(),
+            Stats::open(dir.path().join("st.json")),
+            Some(dir.path().join("s.json")),
+            Arc::new(NullPlatform),
+        );
         (dir, e)
     }
 

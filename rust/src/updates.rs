@@ -107,7 +107,13 @@ impl UpdateManager {
         let (backend, cancel) = (Arc::clone(&self.backend), Arc::clone(&self.cancel));
         std::thread::spawn(move || {
             let progress_tx = tx.clone();
-            let result = backend.download(&info, &mut |p| { let _ = progress_tx.send(Msg::Progress(p)); }, &|| cancel.load(Ordering::Relaxed));
+            let result = backend.download(
+                &info,
+                &mut |p| {
+                    let _ = progress_tx.send(Msg::Progress(p));
+                },
+                &|| cancel.load(Ordering::Relaxed),
+            );
             let _ = tx.send(Msg::Downloaded(result));
         });
     }
@@ -175,7 +181,12 @@ mod tests {
         fn fetch_latest(&self) -> Result<Option<ReleaseInfo>, UpdateError> {
             self.latest.clone()
         }
-        fn download(&self, _i: &ReleaseInfo, on_progress: &mut dyn FnMut(f64), cancelled: &dyn Fn() -> bool) -> Result<PathBuf, UpdateError> {
+        fn download(
+            &self,
+            _i: &ReleaseInfo,
+            on_progress: &mut dyn FnMut(f64),
+            cancelled: &dyn Fn() -> bool,
+        ) -> Result<PathBuf, UpdateError> {
             on_progress(0.5);
             if cancelled() {
                 return Err(UpdateError::Cancelled);
@@ -185,7 +196,15 @@ mod tests {
     }
 
     fn release(v: &str) -> ReleaseInfo {
-        ReleaseInfo { version: v.into(), tag: format!("v{v}"), notes: String::new(), url: "https://github.com/x".into(), size: 1, sha256: None, page: "p".into() }
+        ReleaseInfo {
+            version: v.into(),
+            tag: format!("v{v}"),
+            notes: String::new(),
+            url: "https://github.com/x".into(),
+            size: 1,
+            sha256: None,
+            page: "p".into(),
+        }
     }
     fn manager(latest: Result<Option<ReleaseInfo>, UpdateError>, download: Result<PathBuf, UpdateError>) -> UpdateManager {
         UpdateManager::new(Arc::new(Fake { latest, download }), "0.4.0")

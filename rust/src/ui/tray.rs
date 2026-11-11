@@ -168,7 +168,21 @@ mod tests {
 
     #[test]
     fn every_tray_label_is_translated() {
-        for key in ["tray.open", "tray.break", "tray.pause", "tray.resume", "tray.night", "tray.quiet", "tray.quiet_end", "tray.quit", "quiet.30", "quiet.60", "quiet.120", "quiet.240", "quiet.forever"] {
+        for key in [
+            "tray.open",
+            "tray.break",
+            "tray.pause",
+            "tray.resume",
+            "tray.night",
+            "tray.quiet",
+            "tray.quiet_end",
+            "tray.quit",
+            "quiet.30",
+            "quiet.60",
+            "quiet.120",
+            "quiet.240",
+            "quiet.forever",
+        ] {
             for lang in ["en", "fa"] {
                 assert_ne!(crate::common::i18n::tr_in(lang, key), key, "{lang} {key}");
             }

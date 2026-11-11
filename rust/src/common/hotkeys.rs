@@ -7,12 +7,8 @@ pub const MOD_WIN: u32 = 0x8;
 pub const MOD_NOREPEAT: u32 = 0x4000;
 
 pub const ACTIONS: [&str; 4] = ["night_light", "break_now", "pause", "quiet"];
-pub const DEFAULTS: [(&str, &str); 4] = [
-    ("night_light", "Ctrl+Alt+N"),
-    ("break_now", "Ctrl+Alt+B"),
-    ("pause", "Ctrl+Alt+P"),
-    ("quiet", "Ctrl+Alt+Q"),
-];
+pub const DEFAULTS: [(&str, &str); 4] =
+    [("night_light", "Ctrl+Alt+N"), ("break_now", "Ctrl+Alt+B"), ("pause", "Ctrl+Alt+P"), ("quiet", "Ctrl+Alt+Q")];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HotkeyError(pub String);

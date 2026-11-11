@@ -11,8 +11,17 @@ pub const QUNS_APP: i32 = 7; // full-screen Store app
 pub const FULLSCREEN_STATES: [i32; 4] = [QUNS_BUSY, QUNS_D3D_FULL_SCREEN, QUNS_PRESENTATION, QUNS_APP];
 
 pub const MEETING_APPS: [&str; 11] = [
-    "zoom.exe", "teams.exe", "ms-teams.exe", "webex.exe", "ciscocollabhost.exe", "atmgr.exe",
-    "skype.exe", "lync.exe", "bluejeans.exe", "gotomeeting.exe", "slack.exe",
+    "zoom.exe",
+    "teams.exe",
+    "ms-teams.exe",
+    "webex.exe",
+    "ciscocollabhost.exe",
+    "atmgr.exe",
+    "skype.exe",
+    "lync.exe",
+    "bluejeans.exe",
+    "gotomeeting.exe",
+    "slack.exe",
 ];
 pub const MEETING_WORDS: [&str; 5] = ["meeting", "call", "webinar", "huddle", "conference"];
 pub const BROWSER_MEETING_TITLES: [&str; 4] = ["google meet", "zoom meeting", "meet - ", "microsoft teams meeting"];

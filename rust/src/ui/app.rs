@@ -3,10 +3,10 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::engine::EngineEvent;
 use iced::alignment::Vertical;
 use iced::widget::{button, container, image, scrollable, Space};
 use iced::{window, Element, Length, Point, Size, Subscription, Task, Theme};
-use crate::engine::EngineEvent;
 
 use crate::common::i18n;
 use crate::engine::Engine;
@@ -15,12 +15,12 @@ use crate::platform;
 use super::actions::{self, Setting};
 use super::overlay::{self, ToastKind};
 use super::pages;
-use super::tray::{Tray, TrayCommand};
-use crate::platform::hotkeys::{self as hk, HotkeyService};
 use super::pages::exercises::Run;
-use crate::updates::{auto_check_due, GithubBackend, UpdateManager};
 use super::theme::{self, Btn, Palette};
+use super::tray::{Tray, TrayCommand};
 use super::widgets::*;
+use crate::platform::hotkeys::{self as hk, HotkeyService};
+use crate::updates::{auto_check_due, GithubBackend, UpdateManager};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Page {
@@ -134,7 +134,22 @@ fn main_window_settings() -> window::Settings {
 
 impl App {
     pub fn new(engine: Engine, background: bool) -> (Self, Task<Message>) {
-        let mut app = App { engine, page: Page::Home, main_window: None, system_dark: true, drafts: Default::default(), hk_errors: Default::default(), exercise: None, updates: UpdateManager::new(Arc::new(GithubBackend), crate::VERSION), tray: None, break_windows: Vec::new(), toast: None, hotkeys: None, hotkey_plan: Vec::new(), hk_conflicts: Default::default() };
+        let mut app = App {
+            engine,
+            page: Page::Home,
+            main_window: None,
+            system_dark: true,
+            drafts: Default::default(),
+            hk_errors: Default::default(),
+            exercise: None,
+            updates: UpdateManager::new(Arc::new(GithubBackend), crate::VERSION),
+            tray: None,
+            break_windows: Vec::new(),
+            toast: None,
+            hotkeys: None,
+            hotkey_plan: Vec::new(),
+            hk_conflicts: Default::default(),
+        };
         app.engine.start();
         i18n::set_language(&app.engine.settings.general.language);
         app.tray = Tray::new(&app.engine.settings.general.language);
@@ -162,7 +177,11 @@ impl App {
     }
 
     pub fn theme(&self, _id: window::Id) -> Theme {
-        if self.ctx().p.dark { Theme::Dark } else { Theme::Light }
+        if self.ctx().p.dark {
+            Theme::Dark
+        } else {
+            Theme::Light
+        }
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
@@ -178,7 +197,8 @@ impl App {
                 }
                 self.updates.poll();
                 self.maybe_auto_check();
-                let (lang, paused, night) = (self.engine.settings.general.language.clone(), self.engine.paused, self.engine.settings.night_light.enabled);
+                let (lang, paused, night) =
+                    (self.engine.settings.general.language.clone(), self.engine.paused, self.engine.settings.night_light.enabled);
                 if let Some(tray) = &mut self.tray {
                     tray.sync(&lang, paused, night);
                 }
@@ -264,7 +284,7 @@ impl App {
             Message::StartExercise(id) => self.exercise = Run::start(id),
             Message::NextExerciseStep => {
                 if let Some(run) = &mut self.exercise {
-                    if !run.next() {
+                    if !run.advance() {
                         self.exercise = None;
                     }
                 }
@@ -279,7 +299,12 @@ impl App {
                 }
             }
             Message::OpenReleasePage => {
-                let page = self.updates.release.as_ref().map(|r| r.page.clone()).unwrap_or_else(|| crate::common::updater::RELEASE_PAGE.to_string());
+                let page = self
+                    .updates
+                    .release
+                    .as_ref()
+                    .map(|r| r.page.clone())
+                    .unwrap_or_else(|| crate::common::updater::RELEASE_PAGE.to_string());
                 platform::open_url(&page);
             }
             Message::PlaySample => {
@@ -297,12 +322,10 @@ impl App {
                 let tasks: Vec<Task<Message>> = messages.into_iter().map(|m| self.update(m)).collect();
                 return Task::batch(tasks);
             }
-            Message::SetQuiet(minutes) => {
-                match minutes {
-                    Some(m) if m <= 0.0 => self.engine.set_quiet(Some(0.0)),
-                    other => self.engine.set_quiet(other),
-                }
-            }
+            Message::SetQuiet(minutes) => match minutes {
+                Some(m) if m <= 0.0 => self.engine.set_quiet(Some(0.0)),
+                other => self.engine.set_quiet(other),
+            },
             Message::Quit => {
                 self.engine.shutdown();
                 return iced::exit();
@@ -337,7 +360,10 @@ impl App {
 
     fn maybe_auto_check(&mut self) {
         let g = &self.engine.settings.general;
-        if !self.updates.is_busy() && self.updates.state == crate::updates::UpdateState::Idle && auto_check_due(g.auto_update, g.last_update_check, now_epoch()) {
+        if !self.updates.is_busy()
+            && self.updates.state == crate::updates::UpdateState::Idle
+            && auto_check_due(g.auto_update, g.last_update_check, now_epoch())
+        {
             self.start_check();
         }
     }
@@ -457,10 +483,8 @@ impl App {
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
-        let mut subs = vec![
-            iced::time::every(Duration::from_secs(1)).map(|_| Message::Tick),
-            window::close_events().map(Message::WindowClosed),
-        ];
+        let mut subs =
+            vec![iced::time::every(Duration::from_secs(1)).map(|_| Message::Tick), window::close_events().map(Message::WindowClosed)];
         if self.tray.is_some() || self.hotkeys.is_some() {
             subs.push(iced::time::every(Duration::from_millis(150)).map(|_| Message::TrayPoll));
         }
@@ -490,13 +514,15 @@ impl App {
             Page::Exercises => pages::exercises::view(ctx, self.exercise.as_ref()),
             Page::Settings => pages::settings::view(ctx, &self.engine, &self.updates, &self.drafts, &self.hk_errors, &self.hk_conflicts),
         };
-        let heading: Element<'_, Message> = rcol![ctx; 
+        let heading: Element<'_, Message> = rcol![ctx;
             label::<Message>(ctx, ctx.t(if self.page == Page::Home { "app" } else { self.page.nav_key() }), Txt::H1),
             if self.page == Page::Home { label::<Message>(ctx, ctx.t("tagline"), Txt::Muted) } else { label::<Message>(ctx, "", Txt::Muted) },
         ]
         .spacing(6)
         .into();
-        let page = scrollable(container(rcol![ctx; heading, Space::new(0.0, 8.0), body].spacing(16)).padding([32.0, 36.0]).width(Length::Fill)).height(Length::Fill);
+        let page =
+            scrollable(container(rcol![ctx; heading, Space::new(0.0, 8.0), body].spacing(16)).padding([32.0, 36.0]).width(Length::Fill))
+                .height(Length::Fill);
         let layout = h_row(ctx, vec![self.sidebar(ctx), container(page).width(Length::Fill).height(Length::Fill).into()]);
         container(layout).width(Length::Fill).height(Length::Fill).style(move |_| theme::root(p)).into()
     }
@@ -516,9 +542,15 @@ impl App {
         for page in Page::ALL {
             let active = self.page == page;
             let fg = if active { p.text } else { p.text_muted };
-            let content = h_row(ctx, vec![icon(page.icon(), 18.0, if active { p.accent } else { fg }), label::<Message>(ctx, ctx.t(page.nav_key()), Txt::Body).color(fg).into()])
-                .spacing(12)
-                .align_y(Vertical::Center);
+            let content = h_row(
+                ctx,
+                vec![
+                    icon(page.icon(), 18.0, if active { p.accent } else { fg }),
+                    label::<Message>(ctx, ctx.t(page.nav_key()), Txt::Body).color(fg).into(),
+                ],
+            )
+            .spacing(12)
+            .align_y(Vertical::Center);
             nav = nav.push(
                 button(container(content).center_y(Length::Fill))
                     .width(Length::Fill)

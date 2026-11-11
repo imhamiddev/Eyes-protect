@@ -87,7 +87,13 @@ pub fn break_view<'a>(ctx: Ctx, e: &'a Engine) -> Element<'a, Message> {
     }
     let can_skip = e.settings.break_lock.skippable && elapsed >= e.settings.break_lock.skip_after_seconds;
     if can_skip {
-        body = body.push(Space::new(0.0, 12.0)).push(action_button(ctx, Some("skip"), &ctx.t("break.skip"), Btn::Secondary, Message::SkipBreak));
+        body = body.push(Space::new(0.0, 12.0)).push(action_button(
+            ctx,
+            Some("skip"),
+            &ctx.t("break.skip"),
+            Btn::Secondary,
+            Message::SkipBreak,
+        ));
     }
     container(container(body).center(Length::Fill)).width(Length::Fill).height(Length::Fill).style(move |_| theme::overlay(p)).into()
 }
@@ -95,8 +101,11 @@ pub fn break_view<'a>(ctx: Ctx, e: &'a Engine) -> Element<'a, Message> {
 pub fn toast_view<'a>(ctx: Ctx, kind: ToastKind, version: &str) -> Element<'a, Message> {
     let p = ctx.p;
     let (title_key, body_key, icon_name) = kind.keys();
-    let body_text = if kind == ToastKind::Update { crate::common::i18n::tr_fmt_in(ctx.lang(), body_key, &[("v", version)]) } else { ctx.t(body_key) };
-    let head = h_row(ctx, vec![icon(icon_name, 22.0, p.accent), label::<Message>(ctx, ctx.t(title_key), Txt::Title).into()]).spacing(10).align_y(Vertical::Center);
+    let body_text =
+        if kind == ToastKind::Update { crate::common::i18n::tr_fmt_in(ctx.lang(), body_key, &[("v", version)]) } else { ctx.t(body_key) };
+    let head = h_row(ctx, vec![icon(icon_name, 22.0, p.accent), label::<Message>(ctx, ctx.t(title_key), Txt::Title).into()])
+        .spacing(10)
+        .align_y(Vertical::Center);
     let buttons: Vec<Element<'a, Message>> = match kind {
         ToastKind::Rule => vec![
             action_button(ctx, Some("coffee"), &ctx.t("toast.start"), Btn::Primary, Message::ToastStartBreak).into(),

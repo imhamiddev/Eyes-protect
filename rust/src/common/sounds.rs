@@ -198,7 +198,8 @@ mod tests {
         sp.play("start", 48, &backend);
         let second = played.borrow()[1].clone();
         assert_eq!(second, first);
-        assert_eq!(std::fs::metadata(&second).unwrap().modified().unwrap(), mtime); // reused, not rewritten
+        assert_eq!(std::fs::metadata(&second).unwrap().modified().unwrap(), mtime);
+        // reused, not rewritten
     }
 
     #[test]

@@ -73,15 +73,15 @@ pub static CITIES: &[City] = &[
 
 /// Look a city up by key; unknown keys fall back to Tehran.
 pub fn city_by_key(key: &str) -> &'static City {
-    CITIES
-        .iter()
-        .find(|c| c.key == key)
-        .or_else(|| CITIES.iter().find(|c| c.key == DEFAULT_CITY))
-        .expect("the default city exists")
+    CITIES.iter().find(|c| c.key == key).or_else(|| CITIES.iter().find(|c| c.key == DEFAULT_CITY)).expect("the default city exists")
 }
 
 pub fn city_name(city: &City, language: &str) -> &'static str {
-    if language == "fa" { city.fa } else { city.en }
+    if language == "fa" {
+        city.fa
+    } else {
+        city.en
+    }
 }
 
 #[cfg(test)]
@@ -94,10 +94,9 @@ mod tests {
         let keys: HashSet<_> = CITIES.iter().map(|c| c.key).collect();
         assert_eq!(keys.len(), CITIES.len());
         assert!(keys.contains("tehran"));
-        assert!(CITIES.iter().all(|c| (-90.0..=90.0).contains(&c.lat)
-            && (-180.0..=180.0).contains(&c.lon)
-            && !c.fa.is_empty()
-            && !c.en.is_empty()));
+        assert!(CITIES
+            .iter()
+            .all(|c| (-90.0..=90.0).contains(&c.lat) && (-180.0..=180.0).contains(&c.lon) && !c.fa.is_empty() && !c.en.is_empty()));
         assert_eq!(city_by_key("nope").key, "tehran");
         assert_eq!(city_name(city_by_key("tehran"), "fa"), "تهران");
         assert_eq!(city_name(city_by_key("tehran"), "en"), "Tehran");

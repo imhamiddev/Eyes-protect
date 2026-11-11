@@ -25,7 +25,7 @@ pub fn settings_path() -> PathBuf {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct General {
-    pub theme: String, // dark | light | system
+    pub theme: String,    // dark | light | system
     pub language: String, // en | fa
     pub autostart: bool,
     pub start_minimized: bool,
@@ -62,14 +62,7 @@ pub struct Rule202020 {
 }
 impl Default for Rule202020 {
     fn default() -> Self {
-        Self {
-            enabled: true,
-            interval_min: 20,
-            break_seconds: 20,
-            snooze_min: 5,
-            detect_natural_breaks: true,
-            use_break_lock: false,
-        }
+        Self { enabled: true, interval_min: 20, break_seconds: 20, snooze_min: 5, detect_natural_breaks: true, use_break_lock: false }
     }
 }
 
@@ -121,15 +114,7 @@ pub struct NightLight {
 }
 impl Default for NightLight {
     fn default() -> Self {
-        Self {
-            enabled: false,
-            strength: 40,
-            schedule: true,
-            start: "20:00".into(),
-            end: "06:30".into(),
-            sun: false,
-            transition_min: 30,
-        }
+        Self { enabled: false, strength: 40, schedule: true, start: "20:00".into(), end: "06:30".into(), sun: false, transition_min: 30 }
     }
 }
 

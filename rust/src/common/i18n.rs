@@ -22,11 +22,7 @@ fn lookup(table: &'static [(&'static str, &'static str)], key: &str) -> Option<&
 
 /// Translate `key` into `language` (falls back to English, then to the key itself).
 pub fn tr_in(language: &str, key: &str) -> String {
-    table(language)
-        .and_then(|t| lookup(t, key))
-        .or_else(|| lookup(EN, key))
-        .map(String::from)
-        .unwrap_or_else(|| key.to_string())
+    table(language).and_then(|t| lookup(t, key)).or_else(|| lookup(EN, key)).map(String::from).unwrap_or_else(|| key.to_string())
 }
 
 /// Like [`tr_in`], then replace each `{name}` placeholder with its value.
@@ -43,7 +39,11 @@ pub fn set_language(code: &str) {
 }
 
 pub fn language() -> &'static str {
-    if CURRENT.load(Ordering::Relaxed) == 1 { "fa" } else { "en" }
+    if CURRENT.load(Ordering::Relaxed) == 1 {
+        "fa"
+    } else {
+        "en"
+    }
 }
 
 pub fn is_rtl() -> bool {

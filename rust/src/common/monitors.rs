@@ -6,7 +6,11 @@ use std::collections::{BTreeMap, BTreeSet};
 pub fn key(device: &str) -> String {
     let cleaned: String = device.replace('\\', "");
     let cleaned = cleaned.trim_start_matches('.');
-    if cleaned.is_empty() { device.to_string() } else { cleaned.to_string() }
+    if cleaned.is_empty() {
+        device.to_string()
+    } else {
+        cleaned.to_string()
+    }
 }
 
 pub fn parse_set(text: &str) -> BTreeSet<String> {

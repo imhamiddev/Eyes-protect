@@ -62,7 +62,12 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine, drafts: &'a std::collections::HashMap<S
     // ---- night light --------------------------------------------------------------------------
     let mut night = vec![setting_row(ctx, &t("display.night"), &t("display.night_desc"), sw(ctx, nl.enabled, BoolKey::NlOn))];
     if nl.enabled {
-        night.push(setting_row(ctx, &t("display.warmth"), "", slider_row(ctx, 0..=100, nl.strength as i32, "%", |v| Message::Set(Setting::Int(IntKey::Warmth, i64::from(v))))));
+        night.push(setting_row(
+            ctx,
+            &t("display.warmth"),
+            "",
+            slider_row(ctx, 0..=100, nl.strength as i32, "%", |v| Message::Set(Setting::Int(IntKey::Warmth, i64::from(v)))),
+        ));
         night.push(setting_row(ctx, &t("display.schedule"), "", sw(ctx, nl.schedule, BoolKey::NlSchedule)));
         if nl.schedule {
             night.push(setting_row(ctx, &t("display.sun"), &t("display.sun_desc"), sw(ctx, nl.sun, BoolKey::NlSun)));
@@ -72,7 +77,9 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine, drafts: &'a std::collections::HashMap<S
                 let info = match (st.polar, st.sunset, st.sunrise) {
                     (Some(Polar::Day), _, _) => t("display.sun_polar_day"),
                     (Some(Polar::Night), _, _) => t("display.sun_polar_night"),
-                    (None, Some(set), Some(rise)) => tr_fmt_in(ctx.lang(), "display.sun_info", &[("s", &format_minutes(set)), ("r", &format_minutes(rise))]),
+                    (None, Some(set), Some(rise)) => {
+                        tr_fmt_in(ctx.lang(), "display.sun_info", &[("s", &format_minutes(set)), ("r", &format_minutes(rise))])
+                    }
                     _ => String::new(),
                 };
                 night.push(setting_row(ctx, "", &info, iced::widget::Space::new(0, 0).into()));
@@ -80,7 +87,12 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine, drafts: &'a std::collections::HashMap<S
                 night.push(setting_row(ctx, &t("display.from"), "", time_field(ctx, StrKey::NlStart, &nl.start, drafts)));
                 night.push(setting_row(ctx, &t("display.to"), "", time_field(ctx, StrKey::NlEnd, &nl.end, drafts)));
             }
-            night.push(setting_row(ctx, &t("display.transition"), "", stepper(ctx, nl.transition_min, 0, 60, 5, |v| Message::Set(Setting::Int(IntKey::Transition, v)))));
+            night.push(setting_row(
+                ctx,
+                &t("display.transition"),
+                "",
+                stepper(ctx, nl.transition_min, 0, 60, 5, |v| Message::Set(Setting::Int(IntKey::Transition, v))),
+            ));
         }
     }
 
@@ -89,7 +101,12 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine, drafts: &'a std::collections::HashMap<S
     let mut dim = vec![setting_row(ctx, &t("display.dimmer"), &t("display.dimmer_desc"), sw(ctx, d.enabled, BoolKey::DimOn))];
     if d.enabled {
         let profiles = [("day", t("display.day")), ("night", t("display.night_p")), ("study", t("display.study"))];
-        dim.push(setting_row(ctx, &t("display.profile"), "", segmented(ctx, &profiles, &d.profile, |k| Message::Set(Setting::Str(StrKey::Profile, k)))));
+        dim.push(setting_row(
+            ctx,
+            &t("display.profile"),
+            "",
+            segmented(ctx, &profiles, &d.profile, |k| Message::Set(Setting::Str(StrKey::Profile, k))),
+        ));
         let bright = |key: IntKey, v: i64| slider_row(ctx, 30..=100, v as i32, "%", move |n| Message::Set(Setting::Int(key, i64::from(n))));
         dim.push(setting_row(ctx, &t("display.day"), "", bright(IntKey::BDay, d.day)));
         dim.push(setting_row(ctx, &t("display.night_brightness"), "", bright(IntKey::BNight, d.night)));
@@ -120,7 +137,10 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine, drafts: &'a std::collections::HashMap<S
         let k2 = key.clone();
         let mut controls = vec![toggle(ctx, on, move |v| Message::Set(Setting::MonitorOn(k1.clone(), v)))];
         if on {
-            controls.insert(0, slider_row(ctx, 30..=100, factor as i32, "%", move |n| Message::Set(Setting::MonitorBrightness(k2.clone(), i64::from(n)))));
+            controls.insert(
+                0,
+                slider_row(ctx, 30..=100, factor as i32, "%", move |n| Message::Set(Setting::MonitorBrightness(k2.clone(), i64::from(n)))),
+            );
         }
         monitors.push(setting_row(ctx, &name, &format!("{}×{}", m.width, m.height), h_row(ctx, controls).spacing(16).into()));
     }

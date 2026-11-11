@@ -67,14 +67,7 @@ pub fn local_utc_offset_hours() -> f64 {
     f64::from(Local::now().offset().local_minus_utc()) / 3600.0
 }
 
-pub fn resolve_window(
-    start: &str,
-    end: &str,
-    sun: bool,
-    city: Option<&City>,
-    today: NaiveDate,
-    utc_offset: f64,
-) -> Window {
+pub fn resolve_window(start: &str, end: &str, sun: bool, city: Option<&City>, today: NaiveDate, utc_offset: f64) -> Window {
     if let (true, Some(city)) = (sun, city) {
         let st = sun_times(today, city.lat, city.lon, utc_offset);
         return match (st.polar, st.sunset, st.sunrise) {
@@ -128,7 +121,11 @@ pub fn night_light_active(cfg: &NightLight, now: NaiveTime) -> bool {
     if !cfg.enabled {
         return false;
     }
-    if cfg.schedule { safe_window(now, &cfg.start, &cfg.end) } else { true }
+    if cfg.schedule {
+        safe_window(now, &cfg.start, &cfg.end)
+    } else {
+        true
+    }
 }
 
 /// The profile in force: study is always manual; day/night follow the clock.
@@ -137,7 +134,11 @@ pub fn effective_profile(cfg: &Dimmer, now: NaiveTime) -> &'static str {
     if cfg.profile == "study" || !cfg.schedule {
         return known(&cfg.profile);
     }
-    if safe_window(now, &cfg.night_start, &cfg.night_end) { "night" } else { "day" }
+    if safe_window(now, &cfg.night_start, &cfg.night_end) {
+        "night"
+    } else {
+        "day"
+    }
 }
 
 pub fn profile_brightness(cfg: &Dimmer, profile: &str) -> i64 {
@@ -339,7 +340,8 @@ mod tests {
     #[test]
     fn night_light_fades_gradually_through_the_evening() {
         let n = NightLight { enabled: true, strength: 100, schedule: true, transition_min: 30, ..night_cfg() };
-        let ks: Vec<i32> = [0, 10, 20, 30].iter().map(|m| compute_display_state(&n, &Dimmer::default(), t(20, *m), &plain()).kelvin).collect();
+        let ks: Vec<i32> =
+            [0, 10, 20, 30].iter().map(|m| compute_display_state(&n, &Dimmer::default(), t(20, *m), &plain()).kelvin).collect();
         assert!(ks[0] == 6500 && ks[3] == 1900);
         assert!(ks.windows(2).all(|w| w[0] >= w[1]) && 1900 < ks[1] && ks[1] < 6500);
     }

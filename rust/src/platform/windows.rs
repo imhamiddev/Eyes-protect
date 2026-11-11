@@ -5,28 +5,27 @@ use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
 use std::ptr::{null, null_mut};
 
+use std::sync::mpsc::{channel, Receiver};
 use windows_sys::Win32::Foundation::{CloseHandle, HWND, LPARAM, RECT};
 use windows_sys::Win32::Graphics::Gdi::{
-    CreateDCW, DeleteDC, EnumDisplayMonitors, GetDC, GetMonitorInfoW, ReleaseDC, HDC,
-    HMONITOR, MONITORINFOEXW,
+    CreateDCW, DeleteDC, EnumDisplayMonitors, GetDC, GetMonitorInfoW, ReleaseDC, HDC, HMONITOR, MONITORINFOEXW,
 };
-use windows_sys::Win32::UI::ColorSystem::SetDeviceGammaRamp;
 use windows_sys::Win32::Media::Audio::{PlaySoundW, SND_ASYNC, SND_FILENAME, SND_NODEFAULT};
 use windows_sys::Win32::System::Registry::{
-    RegCloseKey, RegDeleteValueW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW, HKEY, HKEY_CURRENT_USER,
-    KEY_QUERY_VALUE, KEY_SET_VALUE, REG_DWORD, REG_SZ,
+    RegCloseKey, RegDeleteValueW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW, HKEY, HKEY_CURRENT_USER, KEY_QUERY_VALUE, KEY_SET_VALUE,
+    REG_DWORD, REG_SZ,
 };
 use windows_sys::Win32::System::SystemInformation::GetTickCount;
-use windows_sys::Win32::System::Threading::{CreateMutexW, OpenProcess, QueryFullProcessImageNameW};
-use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
-use windows_sys::Win32::UI::Shell::SHQueryUserNotificationState;
 use windows_sys::Win32::System::Threading::GetCurrentThreadId;
+use windows_sys::Win32::System::Threading::{CreateMutexW, OpenProcess, QueryFullProcessImageNameW};
+use windows_sys::Win32::UI::ColorSystem::SetDeviceGammaRamp;
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{RegisterHotKey, UnregisterHotKey};
+use windows_sys::Win32::UI::Shell::SHQueryUserNotificationState;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GetForegroundWindow, GetMessageW, GetWindowTextW, GetWindowThreadProcessId, PeekMessageW, PostThreadMessageW,
-    SendMessageTimeoutW, HWND_BROADCAST, MSG, PM_NOREMOVE, SMTO_ABORTIFHUNG, WM_HOTKEY, WM_QUIT, WM_SETTINGCHANGE,
+    GetForegroundWindow, GetMessageW, GetWindowTextW, GetWindowThreadProcessId, PeekMessageW, PostThreadMessageW, SendMessageTimeoutW,
+    HWND_BROADCAST, MSG, PM_NOREMOVE, SMTO_ABORTIFHUNG, WM_HOTKEY, WM_QUIT, WM_SETTINGCHANGE,
 };
-use std::sync::mpsc::{channel, Receiver};
 
 use super::{Monitor, Platform};
 use crate::common::colortemp::Ramp;
@@ -73,9 +72,7 @@ fn query_dword(key: HKEY, name: &str) -> Option<u32> {
     let name = wide(name);
     let (mut value, mut size, mut kind) = (0u32, 4u32, 0u32);
     // SAFETY: all out pointers reference live locals of the right size.
-    let status = unsafe {
-        RegQueryValueExW(key, name.as_ptr(), null(), &mut kind, (&mut value as *mut u32).cast(), &mut size)
-    };
+    let status = unsafe { RegQueryValueExW(key, name.as_ptr(), null(), &mut kind, (&mut value as *mut u32).cast(), &mut size) };
     (status == 0 && kind == REG_DWORD).then_some(value)
 }
 
@@ -224,12 +221,29 @@ impl Platform for WindowsPlatform {
     }
 }
 
-/// Create a named mutex so the installer can detect a running app. The handle is kept for
-/// the lifetime of the process.
-pub fn create_single_instance_mutex(name: &str) -> bool {
+/// Result of [`claim_single_instance`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Instance {
+    /// This is the only running copy.
+    First,
+    /// Another copy already runs (or the mutex could not be created).
+    AlreadyRunning,
+}
+
+/// Create the named mutex the installer waits on (`AppMutex`) and report whether another copy
+/// already holds it. The handle is kept for the lifetime of the process.
+pub fn claim_single_instance(name: &str) -> Instance {
+    use windows_sys::Win32::Foundation::{GetLastError, ERROR_ALREADY_EXISTS};
     let n = wide(name);
     // SAFETY: `n` is NUL-terminated; the handle is intentionally leaked.
-    unsafe { !CreateMutexW(null(), 0, n.as_ptr()).is_null() }
+    unsafe {
+        let handle = CreateMutexW(null(), 0, n.as_ptr());
+        if handle.is_null() || GetLastError() == ERROR_ALREADY_EXISTS {
+            Instance::AlreadyRunning
+        } else {
+            Instance::First
+        }
+    }
 }
 
 /// Owns a thread that registers global hotkeys and forwards presses.
