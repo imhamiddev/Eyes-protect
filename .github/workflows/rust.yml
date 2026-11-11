@@ -1,0 +1,83 @@
+name: Rust
+on:
+  push:
+    branches: [main, rust-rewrite]
+    paths: ["rust/**", "CHANGELOG.md", "installer/eyecare-rust.iss", ".github/workflows/rust.yml"]
+    # Pre-release builds: `git tag rust-v0.4.0-rc1`. The prefix keeps the Python release workflow (tags v*) and its
+    # in-app updater away from these test builds.
+    tags: ["rust-v*"]
+  pull_request:
+    paths: ["rust/**", "CHANGELOG.md", "installer/eyecare-rust.iss", ".github/workflows/rust.yml"]
+  workflow_dispatch:
+permissions:
+  contents: write
+env:
+  CARGO_TERM_COLOR: always
+defaults:
+  run:
+    working-directory: rust
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { components: "rustfmt, clippy" }
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: rust }
+      - run: cargo fmt --check
+        if: matrix.os == 'ubuntu-latest'
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test --all-targets
+
+  windows-build:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: rust }
+      - run: cargo build --release
+      - name: Read version
+        id: ver
+        shell: bash
+        run: echo "version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
+      - name: Install Inno Setup
+        working-directory: .
+        run: choco install innosetup --no-progress -y
+      - name: Build installer
+        working-directory: .
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=${{ steps.ver.outputs.version }} installer\eyecare-rust.iss'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EyeCare-Rust-Setup
+          path: dist-installer/EyeCare-Rust-Setup.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eyecare-exe
+          path: rust/target/release/eyecare.exe
+      - name: Name the portable exe
+        if: startsWith(github.ref, 'refs/tags/rust-v')
+        shell: bash
+        run: cp target/release/eyecare.exe ../EyeCare-Rust.exe
+      - name: Publish pre-release
+        if: startsWith(github.ref, 'refs/tags/rust-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: true
+          name: Eye Care (Rust build) ${{ github.ref_name }}
+          body: |
+            Test build of the Rust rewrite. This is a pre-release: the Python app's updater ignores it.
+
+            - `EyeCare-Rust-Setup.exe`: installer (same install folder and settings as the Python version)
+            - `EyeCare-Rust.exe`: portable executable
+
+            Not yet verified on a real desktop (night light, tray, shortcuts, multi-monitor). See PR #21.
+          files: |
+            dist-installer/EyeCare-Rust-Setup.exe
+            EyeCare-Rust.exe
