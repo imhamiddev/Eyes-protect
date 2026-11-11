@@ -13,6 +13,9 @@ pub mod windows;
 pub struct Monitor {
     /// e.g. `\\.\DISPLAY1`
     pub device: String,
+    /// Top-left corner on the virtual desktop.
+    pub x: i32,
+    pub y: i32,
     pub width: u32,
     pub height: u32,
     pub primary: bool,
@@ -57,7 +60,7 @@ impl Platform for NullPlatform {
         false
     }
     fn list_monitors(&self) -> Vec<Monitor> {
-        vec![Monitor { device: "DISPLAY1".into(), width: 1920, height: 1080, primary: true }]
+        vec![Monitor { device: "DISPLAY1".into(), x: 0, y: 0, width: 1920, height: 1080, primary: true }]
     }
     fn notification_state(&self) -> Option<i32> {
         None

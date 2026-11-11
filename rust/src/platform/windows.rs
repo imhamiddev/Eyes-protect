@@ -127,6 +127,8 @@ impl Platform for WindowsPlatform {
                 let r = info.monitorInfo.rcMonitor;
                 found.push(Monitor {
                     device: from_wide(&info.szDevice),
+                    x: r.left,
+                    y: r.top,
                     width: (r.right - r.left).max(0) as u32,
                     height: (r.bottom - r.top).max(0) as u32,
                     primary: info.monitorInfo.dwFlags & 1 != 0,

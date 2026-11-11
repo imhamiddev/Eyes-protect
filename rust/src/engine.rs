@@ -532,7 +532,7 @@ mod tests {
             Arc::new(Self {
                 idle: Mutex::new(0.0),
                 state: Mutex::new(Some(5)),
-                monitors: Mutex::new(vec![Monitor { device: "DISPLAY1".into(), width: 1920, height: 1080, primary: true }]),
+                monitors: Mutex::new(vec![Monitor { device: "DISPLAY1".into(), x: 0, y: 0, width: 1920, height: 1080, primary: true }]),
                 monitor_ramps: Mutex::new(HashMap::new()),
                 primary_ramps: Mutex::new(Vec::new()),
                 per_device_ok: true,
@@ -541,8 +541,8 @@ mod tests {
         fn two() -> Arc<Self> {
             let m = Self::new();
             *m.monitors.lock().unwrap() = vec![
-                Monitor { device: "\\\\.\\DISPLAY1".into(), width: 1920, height: 1080, primary: true },
-                Monitor { device: "\\\\.\\DISPLAY2".into(), width: 2560, height: 1440, primary: false },
+                Monitor { device: "\\\\.\\DISPLAY1".into(), x: 0, y: 0, width: 1920, height: 1080, primary: true },
+                Monitor { device: "\\\\.\\DISPLAY2".into(), x: 1920, y: 0, width: 2560, height: 1440, primary: false },
             ];
             m
         }
