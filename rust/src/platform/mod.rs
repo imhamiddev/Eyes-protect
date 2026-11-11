@@ -6,6 +6,7 @@ use std::path::Path;
 use crate::common::colortemp::Ramp;
 use crate::features::smartpause::Foreground;
 
+pub mod hotkeys;
 #[cfg(windows)]
 pub mod windows;
 

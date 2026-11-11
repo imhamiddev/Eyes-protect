@@ -39,7 +39,7 @@ fn update_row<'a>(ctx: Ctx, um: &UpdateManager) -> Element<'a, Message> {
     setting_row(ctx, &fmt("upd.version", &[("v", crate::VERSION)]), &desc, button)
 }
 
-fn shortcut_field<'a>(ctx: Ctx, index: usize, current: &str, drafts: &'a HashMap<String, String>, error: Option<&String>) -> Element<'a, Message> {
+fn shortcut_field<'a>(ctx: Ctx, index: usize, current: &str, drafts: &'a HashMap<String, String>, error: Option<String>) -> Element<'a, Message> {
     let id = format!("{:?}", StrKey::Hotkey(index));
     let shown = drafts.get(&id).cloned().unwrap_or_else(|| current.to_string());
     let p = ctx.p;
@@ -57,12 +57,12 @@ fn shortcut_field<'a>(ctx: Ctx, index: usize, current: &str, drafts: &'a HashMap
             selection: p.accent_soft,
         });
     match error {
-        Some(msg) => rcol![ctx; field, label::<Message>(ctx, msg.clone(), Txt::Caption).color(p.danger)].spacing(4).into(),
+        Some(msg) => rcol![ctx; field, label::<Message>(ctx, msg, Txt::Caption).color(p.danger)].spacing(4).into(),
         None => field.into(),
     }
 }
 
-pub fn view<'a>(ctx: Ctx, e: &'a Engine, um: &UpdateManager, drafts: &'a HashMap<String, String>, hk_errors: &'a HashMap<usize, String>) -> Element<'a, Message> {
+pub fn view<'a>(ctx: Ctx, e: &'a Engine, um: &UpdateManager, drafts: &'a HashMap<String, String>, hk_errors: &'a HashMap<usize, String>, conflicts: &std::collections::HashSet<usize>) -> Element<'a, Message> {
     let s = &e.settings;
     let g = &s.general;
     let t = |k: &str| ctx.t(k);
@@ -104,7 +104,9 @@ pub fn view<'a>(ctx: Ctx, e: &'a Engine, um: &UpdateManager, drafts: &'a HashMap
     if hk.enabled {
         let combos = [&hk.night_light, &hk.break_now, &hk.pause, &hk.quiet];
         for (i, action) in ACTIONS.iter().enumerate() {
-            hk_rows.push(setting_row(ctx, &t(&format!("hk.{action}")), "", shortcut_field(ctx, i, combos[i], drafts, hk_errors.get(&i))));
+            let in_use = conflicts.contains(&i).then(|| t("hk.in_use"));
+            let error = hk_errors.get(&i).cloned().or(in_use);
+            hk_rows.push(setting_row(ctx, &t(&format!("hk.{action}")), "", shortcut_field(ctx, i, combos[i], drafts, error)));
         }
     }
 

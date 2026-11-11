@@ -16,6 +16,7 @@ use super::actions::{self, Setting};
 use super::overlay::{self, ToastKind};
 use super::pages;
 use super::tray::{Tray, TrayCommand};
+use crate::platform::hotkeys::{self as hk, HotkeyService};
 use super::pages::exercises::Run;
 use crate::updates::{auto_check_due, GithubBackend, UpdateManager};
 use super::theme::{self, Btn, Palette};
@@ -110,6 +111,11 @@ pub struct App {
     pub break_windows: Vec<window::Id>,
     /// The reminder toast currently on screen: (window, what, seconds shown).
     pub toast: Option<(window::Id, ToastKind, u32)>,
+    pub hotkeys: Option<HotkeyService>,
+    /// The settings the registered shortcuts were built from (to detect changes).
+    hotkey_plan: Vec<hk::Binding>,
+    /// Shortcuts another program already owns.
+    pub hk_conflicts: std::collections::HashSet<usize>,
 }
 
 const FONTS: [&[u8]; 6] = [
@@ -128,10 +134,11 @@ fn main_window_settings() -> window::Settings {
 
 impl App {
     pub fn new(engine: Engine, background: bool) -> (Self, Task<Message>) {
-        let mut app = App { engine, page: Page::Home, main_window: None, system_dark: true, drafts: Default::default(), hk_errors: Default::default(), exercise: None, updates: UpdateManager::new(Arc::new(GithubBackend), crate::VERSION), tray: None, break_windows: Vec::new(), toast: None };
+        let mut app = App { engine, page: Page::Home, main_window: None, system_dark: true, drafts: Default::default(), hk_errors: Default::default(), exercise: None, updates: UpdateManager::new(Arc::new(GithubBackend), crate::VERSION), tray: None, break_windows: Vec::new(), toast: None, hotkeys: None, hotkey_plan: Vec::new(), hk_conflicts: Default::default() };
         app.engine.start();
         i18n::set_language(&app.engine.settings.general.language);
         app.tray = Tray::new(&app.engine.settings.general.language);
+        app.reload_hotkeys();
         let task = if background { Task::none() } else { app.open_main() };
         (app, task)
     }
@@ -235,6 +242,7 @@ impl App {
                 }
                 let _ = actions::apply(&mut self.engine, &change);
                 i18n::set_language(&self.engine.settings.general.language);
+                self.reload_hotkeys();
             }
             Message::TimeDraft(key, text) => {
                 let id = format!("{key:?}");
@@ -282,7 +290,11 @@ impl App {
             }
             Message::TrayPoll => {
                 let commands = self.tray.as_ref().map(|t| t.poll()).unwrap_or_default();
-                let tasks: Vec<Task<Message>> = commands.into_iter().map(|c| self.update(command_message(c))).collect();
+                let mut messages: Vec<Message> = commands.into_iter().map(command_message).collect();
+                if let Some(service) = &self.hotkeys {
+                    messages.extend(service.poll().into_iter().filter_map(hotkey_message));
+                }
+                let tasks: Vec<Task<Message>> = messages.into_iter().map(|m| self.update(m)).collect();
                 return Task::batch(tasks);
             }
             Message::SetQuiet(minutes) => {
@@ -297,6 +309,24 @@ impl App {
             }
         }
         Task::none()
+    }
+
+    /// (Re-)register global shortcuts if the configured ones changed.
+    fn reload_hotkeys(&mut self) {
+        let plan = hk::plan(&self.engine.settings.hotkeys);
+        if plan == self.hotkey_plan && self.hotkeys.is_some() {
+            return;
+        }
+        self.hotkeys = None; // drop the old registration first
+        self.hotkey_plan = plan.clone();
+        if plan.is_empty() {
+            self.hk_conflicts.clear();
+            return;
+        }
+        let (service, failed) = HotkeyService::start(&plan);
+        self.hk_conflicts = failed.into_iter().collect();
+        self.engine.hotkey_failures = self.hk_conflicts.iter().map(|i| hk::action_name(*i).to_string()).collect();
+        self.hotkeys = Some(service);
     }
 
     fn start_check(&mut self) {
@@ -431,7 +461,7 @@ impl App {
             iced::time::every(Duration::from_secs(1)).map(|_| Message::Tick),
             window::close_events().map(Message::WindowClosed),
         ];
-        if self.tray.is_some() {
+        if self.tray.is_some() || self.hotkeys.is_some() {
             subs.push(iced::time::every(Duration::from_millis(150)).map(|_| Message::TrayPoll));
         }
         if self.engine.is_animating() {
@@ -458,7 +488,7 @@ impl App {
             Page::Care => pages::care::view(ctx, &self.engine),
             Page::Display => pages::display::view(ctx, &self.engine, &self.drafts),
             Page::Exercises => pages::exercises::view(ctx, self.exercise.as_ref()),
-            Page::Settings => pages::settings::view(ctx, &self.engine, &self.updates, &self.drafts, &self.hk_errors),
+            Page::Settings => pages::settings::view(ctx, &self.engine, &self.updates, &self.drafts, &self.hk_errors, &self.hk_conflicts),
         };
         let heading: Element<'_, Message> = rcol![ctx; 
             label::<Message>(ctx, ctx.t(if self.page == Page::Home { "app" } else { self.page.nav_key() }), Txt::H1),
@@ -515,6 +545,17 @@ impl App {
     }
 }
 
+/// The app message for a pressed global shortcut (index into the hotkey actions).
+pub fn hotkey_message(index: usize) -> Option<Message> {
+    match crate::common::hotkeys::ACTIONS.get(index).copied()? {
+        "night_light" => Some(Message::ToggleNight(true)),
+        "break_now" => Some(Message::TakeBreak),
+        "pause" => Some(Message::TogglePause),
+        "quiet" => Some(Message::ToggleQuiet),
+        _ => None,
+    }
+}
+
 /// The app message for a tray menu command.
 pub fn command_message(cmd: TrayCommand) -> Message {
     match cmd {
@@ -547,3 +588,24 @@ pub fn run(background: bool) -> iced::Result {
 
 #[allow(dead_code)]
 fn _assert_send(_: Arc<dyn platform::Platform>) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shortcuts_map_to_the_right_messages() {
+        assert!(matches!(hotkey_message(0), Some(Message::ToggleNight(_))));
+        assert!(matches!(hotkey_message(1), Some(Message::TakeBreak)));
+        assert!(matches!(hotkey_message(2), Some(Message::TogglePause)));
+        assert!(matches!(hotkey_message(3), Some(Message::ToggleQuiet)));
+        assert!(hotkey_message(4).is_none());
+    }
+
+    #[test]
+    fn tray_commands_map_to_messages() {
+        assert!(matches!(command_message(TrayCommand::Open), Message::OpenMain));
+        assert!(matches!(command_message(TrayCommand::Quiet(Some(30.0))), Message::SetQuiet(Some(m)) if m == 30.0));
+        assert!(matches!(command_message(TrayCommand::Quit), Message::Quit));
+    }
+}

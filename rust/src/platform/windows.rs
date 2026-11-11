@@ -20,10 +20,13 @@ use windows_sys::Win32::System::SystemInformation::GetTickCount;
 use windows_sys::Win32::System::Threading::{CreateMutexW, OpenProcess, QueryFullProcessImageNameW};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
 use windows_sys::Win32::UI::Shell::SHQueryUserNotificationState;
+use windows_sys::Win32::System::Threading::GetCurrentThreadId;
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::{RegisterHotKey, UnregisterHotKey};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GetForegroundWindow, GetWindowTextW, GetWindowThreadProcessId, SendMessageTimeoutW, HWND_BROADCAST,
-    SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,
+    GetForegroundWindow, GetMessageW, GetWindowTextW, GetWindowThreadProcessId, PeekMessageW, PostThreadMessageW,
+    SendMessageTimeoutW, HWND_BROADCAST, MSG, PM_NOREMOVE, SMTO_ABORTIFHUNG, WM_HOTKEY, WM_QUIT, WM_SETTINGCHANGE,
 };
+use std::sync::mpsc::{channel, Receiver};
 
 use super::{Monitor, Platform};
 use crate::common::colortemp::Ramp;
@@ -227,4 +230,58 @@ pub fn create_single_instance_mutex(name: &str) -> bool {
     let n = wide(name);
     // SAFETY: `n` is NUL-terminated; the handle is intentionally leaked.
     unsafe { !CreateMutexW(null(), 0, n.as_ptr()).is_null() }
+}
+
+/// Owns a thread that registers global hotkeys and forwards presses.
+pub struct HotkeyService {
+    thread_id: u32,
+    pressed: Receiver<usize>,
+}
+
+impl HotkeyService {
+    /// Register `bindings`; returns the service and the action indexes that could not be registered
+    /// (typically because another app already owns the shortcut).
+    pub fn start(bindings: &[super::hotkeys::Binding]) -> (HotkeyService, Vec<usize>) {
+        let (press_tx, pressed) = channel::<usize>();
+        let (ready_tx, ready_rx) = channel::<(u32, Vec<usize>)>();
+        let bindings = bindings.to_vec();
+        std::thread::spawn(move || {
+            // SAFETY: plain Win32 calls on this thread; ids are the action indexes + 1.
+            unsafe {
+                let mut msg: MSG = std::mem::zeroed();
+                PeekMessageW(&mut msg, null_mut(), 0, 0, PM_NOREMOVE); // create the thread's message queue
+                let mut failed = Vec::new();
+                for (index, mods, vk) in &bindings {
+                    if RegisterHotKey(null_mut(), *index as i32 + 1, *mods, *vk) == 0 {
+                        failed.push(*index);
+                    }
+                }
+                let _ = ready_tx.send((GetCurrentThreadId(), failed));
+                while GetMessageW(&mut msg, null_mut(), 0, 0) > 0 {
+                    if msg.message == WM_HOTKEY {
+                        let _ = press_tx.send((msg.wParam as usize).saturating_sub(1));
+                    }
+                }
+                for (index, _, _) in &bindings {
+                    UnregisterHotKey(null_mut(), *index as i32 + 1);
+                }
+            }
+        });
+        let (thread_id, failed) = ready_rx.recv().unwrap_or((0, Vec::new()));
+        (HotkeyService { thread_id, pressed }, failed)
+    }
+
+    /// Action indexes pressed since the last call.
+    pub fn poll(&self) -> Vec<usize> {
+        self.pressed.try_iter().collect()
+    }
+}
+
+impl Drop for HotkeyService {
+    fn drop(&mut self) {
+        if self.thread_id != 0 {
+            // SAFETY: asks the hotkey thread to leave its message loop (it unregisters on exit).
+            unsafe { PostThreadMessageW(self.thread_id, WM_QUIT, 0, 0) };
+        }
+    }
 }
