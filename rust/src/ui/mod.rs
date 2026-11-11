@@ -7,3 +7,4 @@ pub mod pages;
 pub mod theme;
 pub mod widgets;
 pub mod tray;
+pub mod overlay;

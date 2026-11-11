@@ -5,13 +5,15 @@ use std::time::Duration;
 
 use iced::alignment::Vertical;
 use iced::widget::{button, container, image, scrollable, Space};
-use iced::{window, Element, Length, Size, Subscription, Task, Theme};
+use iced::{window, Element, Length, Point, Size, Subscription, Task, Theme};
+use crate::engine::EngineEvent;
 
 use crate::common::i18n;
 use crate::engine::Engine;
 use crate::platform;
 
 use super::actions::{self, Setting};
+use super::overlay::{self, ToastKind};
 use super::pages;
 use super::tray::{Tray, TrayCommand};
 use super::pages::exercises::Run;
@@ -84,6 +86,12 @@ pub enum Message {
     /// Poll the tray icon for clicks (~7 times a second).
     TrayPoll,
     SetQuiet(Option<f64>),
+    SkipBreak,
+    ToastStartBreak,
+    ToastSnooze,
+    ToastDrank,
+    ToastShowStretch,
+    DismissToast,
     Quit,
 }
 
@@ -98,6 +106,10 @@ pub struct App {
     pub exercise: Option<Run>,
     pub updates: UpdateManager,
     pub tray: Option<Tray>,
+    /// Break screens (one window per monitor).
+    pub break_windows: Vec<window::Id>,
+    /// The reminder toast currently on screen: (window, what, seconds shown).
+    pub toast: Option<(window::Id, ToastKind, u32)>,
 }
 
 const FONTS: [&[u8]; 6] = [
@@ -116,7 +128,7 @@ fn main_window_settings() -> window::Settings {
 
 impl App {
     pub fn new(engine: Engine, background: bool) -> (Self, Task<Message>) {
-        let mut app = App { engine, page: Page::Home, main_window: None, system_dark: true, drafts: Default::default(), hk_errors: Default::default(), exercise: None, updates: UpdateManager::new(Arc::new(GithubBackend), crate::VERSION), tray: None };
+        let mut app = App { engine, page: Page::Home, main_window: None, system_dark: true, drafts: Default::default(), hk_errors: Default::default(), exercise: None, updates: UpdateManager::new(Arc::new(GithubBackend), crate::VERSION), tray: None, break_windows: Vec::new(), toast: None };
         app.engine.start();
         i18n::set_language(&app.engine.settings.general.language);
         app.tray = Tray::new(&app.engine.settings.general.language);
@@ -150,7 +162,8 @@ impl App {
         match message {
             Message::Tick => {
                 self.engine.on_tick();
-                self.handle_events();
+                let mut tasks = vec![self.handle_events()];
+                tasks.push(self.age_toast());
                 if let Some(run) = &mut self.exercise {
                     if !run.tick(1.0) {
                         self.exercise = None;
@@ -162,6 +175,7 @@ impl App {
                 if let Some(tray) = &mut self.tray {
                     tray.sync(&lang, paused, night);
                 }
+                return Task::batch(tasks);
             }
             Message::Frame => {
                 self.engine.advance_tween(16.0);
@@ -173,10 +187,37 @@ impl App {
                 if self.main_window == Some(id) {
                     self.main_window = None;
                 }
+                self.break_windows.retain(|w| *w != id);
+                if self.toast.map(|t| t.0) == Some(id) {
+                    self.toast = None;
+                }
             }
+            Message::SkipBreak => {
+                self.engine.skip_break();
+                return self.handle_events();
+            }
+            Message::ToastStartBreak => {
+                let close = self.close_toast();
+                self.engine.start_break();
+                return Task::batch([close, self.handle_events()]);
+            }
+            Message::ToastSnooze => {
+                self.engine.snooze();
+                return self.close_toast();
+            }
+            Message::ToastDrank => {
+                self.engine.record_water();
+                return self.close_toast();
+            }
+            Message::ToastShowStretch => {
+                self.page = Page::Exercises;
+                self.exercise = Run::start("neck");
+                return Task::batch([self.close_toast(), self.open_main()]);
+            }
+            Message::DismissToast => return self.close_toast(),
             Message::TakeBreak => {
                 self.engine.start_break();
-                self.handle_events();
+                return self.handle_events();
             }
             Message::TogglePause => {
                 let paused = !self.engine.paused;
@@ -271,9 +312,118 @@ impl App {
         }
     }
 
-    /// React to what the engine reported (toasts, break screens... are added by later modules).
-    fn handle_events(&mut self) {
-        let _ = self.engine.drain_events();
+    /// React to what the engine reported: open/close break screens and toasts, play chimes.
+    fn handle_events(&mut self) -> Task<Message> {
+        let mut tasks: Vec<Task<Message>> = Vec::new();
+        for event in self.engine.drain_events() {
+            match event {
+                EngineEvent::PromptRequested => {
+                    self.engine.play_sound("notify", true, false);
+                    tasks.push(self.show_toast(ToastKind::Rule));
+                }
+                EngineEvent::BreakStarted(_) => {
+                    tasks.push(self.close_toast());
+                    self.engine.play_sound("start", false, false);
+                    tasks.push(self.open_break_windows());
+                }
+                EngineEvent::BreakFinished(completed) => {
+                    if completed {
+                        self.engine.play_sound("end", false, false);
+                    }
+                    tasks.push(self.close_break_windows());
+                }
+                EngineEvent::NaturalBreak => tasks.push(self.close_toast()),
+                EngineEvent::BlinkRequested => {
+                    self.engine.record_blink_shown();
+                    self.engine.play_sound("notify", true, false);
+                    tasks.push(self.show_toast(ToastKind::Blink));
+                }
+                EngineEvent::WaterRequested => {
+                    self.engine.play_sound("notify", true, false);
+                    tasks.push(self.show_toast(ToastKind::Water));
+                }
+                EngineEvent::PostureRequested => {
+                    self.engine.play_sound("notify", true, false);
+                    tasks.push(self.show_toast(ToastKind::Posture));
+                }
+                _ => {}
+            }
+        }
+        // The engine may have dropped the prompt itself (snooze/timeout/disabled).
+        if matches!(self.toast, Some((_, ToastKind::Rule, _))) && self.engine.rule.phase != crate::features::rule202020::Phase::Prompt {
+            tasks.push(self.close_toast());
+        }
+        Task::batch(tasks)
+    }
+
+    fn open_break_windows(&mut self) -> Task<Message> {
+        if !self.break_windows.is_empty() {
+            return Task::none();
+        }
+        let monitors = if self.engine.monitors.is_empty() { self.engine.platform().list_monitors() } else { self.engine.monitors.clone() };
+        let mut tasks = Vec::new();
+        for m in monitors {
+            let settings = window::Settings {
+                size: Size::new(m.width as f32, m.height as f32),
+                position: window::Position::Specific(Point::new(m.x as f32, m.y as f32)),
+                decorations: false,
+                resizable: false,
+                level: window::Level::AlwaysOnTop,
+                ..Default::default()
+            };
+            let (id, open) = window::open(settings);
+            self.break_windows.push(id);
+            tasks.push(open.map(Message::WindowOpened));
+        }
+        Task::batch(tasks)
+    }
+
+    fn close_break_windows(&mut self) -> Task<Message> {
+        Task::batch(self.break_windows.drain(..).map(window::close::<Message>).collect::<Vec<_>>())
+    }
+
+    fn show_toast(&mut self, kind: ToastKind) -> Task<Message> {
+        if self.engine.rule.phase == crate::features::rule202020::Phase::Break || !self.break_windows.is_empty() {
+            return Task::none(); // never interrupt a break
+        }
+        if matches!(self.toast, Some((_, ToastKind::Rule, _))) && kind != ToastKind::Rule {
+            return Task::none(); // the 20-20-20 prompt wins
+        }
+        let close = self.close_toast();
+        let primary = self.engine.monitors.iter().find(|m| m.primary).cloned().or_else(|| self.engine.monitors.first().cloned());
+        let (w, h) = (400.0_f32, 190.0_f32);
+        let position = primary
+            .map(|m| Point::new(m.x as f32 + m.width as f32 - w - 24.0, m.y as f32 + m.height as f32 - h - 72.0))
+            .unwrap_or(Point::new(100.0, 100.0));
+        let settings = window::Settings {
+            size: Size::new(w, h),
+            position: window::Position::Specific(position),
+            decorations: false,
+            resizable: false,
+            level: window::Level::AlwaysOnTop,
+            ..Default::default()
+        };
+        let (id, open) = window::open(settings);
+        self.toast = Some((id, kind, 0));
+        Task::batch([close, open.map(Message::WindowOpened)])
+    }
+
+    fn close_toast(&mut self) -> Task<Message> {
+        match self.toast.take() {
+            Some((id, _, _)) => window::close(id),
+            None => Task::none(),
+        }
+    }
+
+    /// Close timed toasts once their time is up.
+    fn age_toast(&mut self) -> Task<Message> {
+        if let Some((_, kind, shown)) = &mut self.toast {
+            *shown += 1;
+            if kind.lifetime_seconds().is_some_and(|max| *shown >= max) {
+                return self.close_toast();
+            }
+        }
+        Task::none()
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
@@ -290,8 +440,17 @@ impl App {
         Subscription::batch(subs)
     }
 
-    pub fn view(&self, _id: window::Id) -> Element<'_, Message> {
+    pub fn view(&self, id: window::Id) -> Element<'_, Message> {
         let ctx = self.ctx();
+        if self.break_windows.contains(&id) {
+            return overlay::break_view(ctx, &self.engine);
+        }
+        if let Some((toast_id, kind, _)) = self.toast {
+            if toast_id == id {
+                let version = self.updates.release.as_ref().map(|r| r.version.as_str()).unwrap_or("");
+                return overlay::toast_view(ctx, kind, version);
+            }
+        }
         let p = ctx.p;
         let body: Element<'_, Message> = match self.page {
             Page::Home => pages::home::view(ctx, &self.engine),
